@@ -1,85 +1,83 @@
-const STORAGE_KEY = 'rms_notifications';
+import * as notificationService from '../services/notificationService.jsx';
 
-const normalizeNotification = (item) => {
-  const accent = item.accent || 'info';
-  const iconMap = {
-    warning: '💳',
-    danger: '⚠️',
-    success: '🏠',
-    info: '🏡',
-    maintenance: '🛠️',
-    announcement: '📢',
-  };
+const normalizeNotification = (it) => ({
+  id: it._id || it.id || Date.now(),
+  title: it.title || it.actionType || 'Notification',
+  message: it.message || it.body || '',
+  unread: it.isRead === true ? false : !(it.isRead === true),
+  type: (it.entityType || it.actionType || 'system').toLowerCase(),
+  category: it.entityType || it.actionType || 'General',
+  createdAt: it.createdAt || new Date().toISOString(),
+  time: it.createdAt || it.time || new Date().toISOString(),
+  raw: it,
+});
 
-  return {
-    ...item,
-    id: item.id ?? Date.now(),
-    title: item.title || 'New update',
-    message: item.message || 'New notification received.',
-    time: item.time || 'Just now',
-    category: item.category || 'General',
-    unread: item.unread ?? true,
-    accent,
-    featured: item.featured ?? false,
-    action: item.action || 'View',
-    icon: typeof item.icon === 'string' ? item.icon : iconMap[accent] || '🔔',
-    details: item.details || null,
-    source: item.source || null,
-    recipient: item.recipient || null,
-    propertyName: item.propertyName || null,
-    buyer: item.buyer || null,
-    amount: item.amount || null,
-    dueDate: item.dueDate || null,
-    saleDate: item.saleDate || null,
-    notes: item.notes || null,
-  };
-};
-
-export const readStoredNotifications = (fallback = []) => {
-  if (typeof window === 'undefined') return fallback;
-
+// Async API-backed methods
+export const fetchNotifications = async () => {
   try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    if (!saved) return fallback.map(normalizeNotification);
-
-    const parsed = JSON.parse(saved);
-    const stored = Array.isArray(parsed) ? parsed : [];
-    const combined = [...stored, ...fallback];
-
-    return combined
-      .filter((item, index, arr) => arr.findIndex((entry) => entry.id === item.id) === index)
-      .map(normalizeNotification);
-  } catch (error) {
-    console.error('Unable to read notifications from storage:', error);
-    return fallback.map(normalizeNotification);
+    const res = await notificationService.fetchNotificationsFromServer();
+    if (res && res.success) return res.data.map((d) => normalizeNotification(d.raw || d));
+    return [];
+  } catch (e) {
+    console.error('fetchNotifications failed', e);
+    return [];
   }
 };
 
-export const saveStoredNotifications = (notifications) => {
-  if (typeof window === 'undefined') return;
-
+export const markAsRead = async (id) => {
   try {
-    const next = (Array.isArray(notifications) ? notifications : []).map(normalizeNotification);
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    window.dispatchEvent(new Event('rms-notifications-updated'));
-  } catch (error) {
-    console.error('Unable to save notifications to storage:', error);
+    const res = await notificationService.markNotificationAsReadOnServer(id);
+    return res && res.success ? res.data : null;
+  } catch (e) {
+    console.error('markAsRead failed', e);
+    return null;
   }
 };
 
-export const addStoredNotification = (notification, fallback = []) => {
-  const existing = readStoredNotifications(fallback);
-  const next = [
-    {
-      id: Date.now(),
-      time: 'Just now',
-      unread: true,
-      featured: false,
-      ...notification,
-    },
-    ...existing,
-  ];
+export const markAllAsRead = async () => {
+  try {
+    const res = await notificationService.markAllNotificationsOnServer();
+    return res && res.success;
+  } catch (e) {
+    console.error('markAllAsRead failed', e);
+    return false;
+  }
+};
 
-  saveStoredNotifications(next);
-  return next;
+export const deleteNotification = async (id) => {
+  try {
+    const res = await notificationService.deleteNotificationOnServer(id);
+    return res && res.success;
+  } catch (e) {
+    console.error('deleteNotification failed', e);
+    return false;
+  }
+};
+
+// Deprecated localStorage helpers (kept for compatibility but not source of truth)
+// Deprecated localStorage helpers removed. Use API-backed notification methods in ../services/notificationService.jsx
+export const readStoredNotifications = () => {
+  console.warn('readStoredNotifications() removed: use fetchNotifications() from services/notificationService.jsx');
+  return [];
+};
+
+export const saveStoredNotifications = () => {
+  console.warn('saveStoredNotifications() removed: persist notifications via backend APIs');
+};
+
+export const addStoredNotification = async (note) => {
+  try {
+    const res = await notificationService.createNotificationOnServer(note);
+    if (res && res.success && res.data) return res.data;
+    // fallback to local in-memory creation
+    const local = notificationService.createNotification(note);
+    return local;
+  } catch (e) {
+    console.error('addStoredNotification failed', e);
+    try {
+      return notificationService.createNotification(note);
+    } catch (err) {
+      return null;
+    }
+  }
 };

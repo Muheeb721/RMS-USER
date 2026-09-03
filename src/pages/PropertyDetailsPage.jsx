@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Descriptions, Button, Tag, Typography, Modal } from 'antd';
+import { Card, Row, Col, Descriptions, Button, Tag, Typography, Modal, Spin } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProperties } from '../contexts/PropertyContext';
 import './PropertyDetailsPage.css';
@@ -7,11 +7,20 @@ import ActionModal from '../components/ActionModal';
 import InquiryModal from '../components/InquiryModal';
 import VisitModal from '../components/VisitModal';
 import SimilarProperties from '../components/SimilarProperties';
+import RentalBookingModal from '../components/RentalBookingModal';
 import { listForProperty as listPriceHistory } from '../utils/priceHistoryStorage';
+import heroImg from '../assets/hero.png';
 import { increment as incrementView, getCount as getViewCount } from '../utils/propertyViewsStorage';
 import { isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage';
 const { Text } = Typography;
 import { toast } from 'react-toastify';
+
+const statusColorMap = {
+  Available: 'green',
+  Reserved: 'gold',
+  Sold: 'red',
+  'For Rent': 'blue',
+};
 
 function PropertyDetailsPage() {
   const { id } = useParams();
@@ -24,28 +33,55 @@ function PropertyDetailsPage() {
   const [priceHistory, setPriceHistory] = useState([]);
   const [viewCount, setViewCount] = useState(0);
   const [verified, setVerified] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const navigate = useNavigate();
   const [images, setImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
 
-  if (!property) return <div className="page-shell">Property not found.</div>;
+  if (!property) return <div className="page-shell"><div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div></div>;
 
   useEffect(() => {
-    try {
-      incrementView(property.id);
-      setViewCount(getViewCount(property.id));
-    } catch (e) {
-      // ignore
-    }
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        try {
+          await incrementView(property.id);
+        } catch (e) {
+          console.warn('increment view failed', e);
+        }
 
-    try {
-      setPriceHistory(listPriceHistory(property.id));
-    } catch (e) {}
+        try {
+          const cnt = await getViewCount(property.id);
+          if (mounted) setViewCount(cnt || 0);
+        } catch (e) {
+          console.warn('get view count failed', e);
+        }
 
-    try {
-      setVerified(isPropertyVerified(property.id));
-    } catch (e) {}
+        try {
+          const ph = await listPriceHistory(property.id);
+          if (mounted) setPriceHistory(ph || []);
+        } catch (e) {
+          console.warn('list price history failed', e);
+        }
+
+        try {
+          const v = await isPropertyVerified(property.id);
+          if (mounted) setVerified(Boolean(v));
+        } catch (e) {
+          console.warn('is verified check failed', e);
+        }
+      } catch (e) {
+        if (mounted) setError('Failed to load property details');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, [property?.id]);
 
   useEffect(() => {
@@ -55,7 +91,7 @@ function PropertyDetailsPage() {
         ? property.images.slice()
         : property.image ? [property.image] : [];
       // fallback default image if empty
-      if (!imgs.length) imgs.push('/src/assets/default-property.jpg');
+      if (!imgs.length) imgs.push(heroImg);
       setImages(imgs);
       setCurrentIndex(0);
     } catch (e) {
@@ -64,22 +100,25 @@ function PropertyDetailsPage() {
   }, [property?.id]);
 
   useEffect(() => {
-    const refreshViews = () => {
+    const refreshViews = async () => {
       try {
-        setViewCount(getViewCount(property.id));
-      } catch (e) {}
+        const cnt = await getViewCount(property.id);
+        setViewCount(cnt || 0);
+      } catch (e) { console.warn(e); }
     };
 
-    const refreshPriceHistory = () => {
+    const refreshPriceHistory = async () => {
       try {
-        setPriceHistory(listPriceHistory(property.id));
-      } catch (e) {}
+        const ph = await listPriceHistory(property.id);
+        setPriceHistory(ph || []);
+      } catch (e) { console.warn(e); }
     };
 
-    const refreshVerified = () => {
+    const refreshVerified = async () => {
       try {
-        setVerified(isPropertyVerified(property.id));
-      } catch (e) {}
+        const v = await isPropertyVerified(property.id);
+        setVerified(Boolean(v));
+      } catch (e) { console.warn(e); }
     };
 
     window.addEventListener('rms-property-views-updated', refreshViews);
@@ -148,10 +187,8 @@ function PropertyDetailsPage() {
           <Col xs={24} lg={10}>
             <Card>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Tag color={property.status === 'Sold' ? 'red' : property.status === 'Reserved' ? 'gold' : property.status === 'For Rent' ? 'blue' : 'green'}>
-                  {property.status}
-                </Tag>
-                {verified && <Tag color="cyan">✓ RMS Verified Property</Tag>}
+                <Tag color={statusColorMap[property.status] || 'green'}>{property.status}</Tag>
+                {verified && <Tag color="cyan">🛡️ RMS Verified</Tag>}
                 <Text type="secondary" style={{ marginLeft: 'auto' }}>Views: {viewCount}</Text>
               </div>
               <Descriptions column={1} style={{ marginTop: 12 }}>
@@ -178,6 +215,9 @@ function PropertyDetailsPage() {
               <div className="card-actions">
                 <Button type="primary" onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); navigate('/contact'); }}>Contact About This Property</Button>
                 <Button onClick={() => setVisitOpen(true)}>Schedule a Visit</Button>
+                {property.transactionType === 'Rent' && (
+                  <Button type="primary" onClick={() => setBookingOpen(true)} style={{ background: '#28b463', borderColor: '#28b463' }}>Rent Now</Button>
+                )}
                 <Button onClick={() => { setIsSaved((saved) => !saved); toast.success(isSaved ? 'Listing removed from saved items.' : 'Listing saved successfully.'); }}>{isSaved ? 'Saved' : 'Save Listing'}</Button>
               </div>
             </Card>
@@ -187,6 +227,7 @@ function PropertyDetailsPage() {
       <ActionModal open={contactOpen} onClose={() => setContactOpen(false)} type="contact" item={property} onSubmit={() => toast.success('Your viewing request has been sent.')} />
       <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={property} onSubmitted={() => toast.success('Inquiry submitted.')} />
       <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={property} onSubmitted={() => toast.success('Visit request submitted.')} />
+      <RentalBookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} property={property} />
       <SimilarProperties property={property} />
     </div>
   );

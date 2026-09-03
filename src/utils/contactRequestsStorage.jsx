@@ -1,7 +1,7 @@
-const STORAGE_KEY = 'rms_contact_requests';
+import apiClient from '../services/apiClient';
 
 const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `CONTACT-${fallbackId}-${Math.random().toString(16).slice(2)}`,
+  id: item.id || item._id || `CONTACT-${fallbackId}-${Math.random().toString(16).slice(2)}`,
   fullName: item.fullName || item.name || '',
   email: item.email || '',
   phone: item.phone || item.contact || '',
@@ -15,40 +15,55 @@ const normalize = (item = {}, fallbackId = Date.now()) => ({
   updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+const read = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await apiClient.get('/contact-requests');
+    const items = res?.data?.success ? res.data.data || [] : [];
+    return Array.isArray(items) ? items.map((p) => normalize(p)) : [];
   } catch (e) {
-    console.error('read contact requests', e);
+    console.error('read contact requests failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-contact-requests-updated'));
-  return next;
+const save = async (records = []) => {
+  try {
+    const res = await apiClient.post('/contact-requests/batch', { records });
+    return res?.data?.success ? res.data.data || records : records;
+  } catch (e) {
+    console.error('save contact requests failed', e);
+    return records;
+  }
 };
 
-const add = (req = {}) => {
-  const next = [normalize(req, Date.now()), ...read()];
-  return save(next);
+const add = async (req = {}) => {
+  try {
+    const res = await apiClient.post('/contact-requests', req);
+    return res?.data?.success ? normalize(res.data.data) : null;
+  } catch (e) {
+    console.error('add contact request failed', e);
+    return null;
+  }
 };
 
-const update = (id, updates = {}) => {
-  const next = read().map((item) => (item.id === id ? normalize({ ...item, ...updates, updatedAt: new Date().toISOString() }, id) : item));
-  return save(next);
+const update = async (id, updates = {}) => {
+  try {
+    const res = await apiClient.put(`/contact-requests/${id}`, updates);
+    return res?.data?.success ? normalize(res.data.data) : null;
+  } catch (e) {
+    console.error('update contact request failed', e);
+    return null;
+  }
 };
 
-const remove = (id) => {
-  const next = read().filter((item) => item.id !== id);
-  return save(next);
+const remove = async (id) => {
+  try {
+    const res = await apiClient.delete(`/contact-requests/${id}`);
+    return res?.data?.success ? true : false;
+  } catch (e) {
+    console.error('remove contact request failed', e);
+    return false;
+  }
 };
 
 export { read, save, add, update, remove };

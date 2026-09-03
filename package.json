@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e-smoke": "node scripts/e2e-smoke.js",
+    "check-localstorage": "node scripts/check-localstorage.js"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
@@ -35,6 +37,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
     "oxlint": "^1.75.0",
+    "playwright": "^1.62.1",
     "prettier": "^3.9.6",
     "vite": "^8.2.0"
   }

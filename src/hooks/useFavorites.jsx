@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addFavorite, removeFavorite } from '../redux/store';
+import favoriteService from '../services/favoriteService';
 
 export const getFavoriteKey = (item) => {
   if (!item || item.id == null) return '';
@@ -25,10 +26,14 @@ export const useFavorites = () => {
   const toggleFavorite = useCallback(
     (item) => {
       const key = getFavoriteKey(item);
+      // optimistic UI update
       if (favorites.includes(key)) {
         dispatch(removeFavorite(key));
+        // try remote remove
+        try { favoriteService.removeFavorite(item.id).catch(()=>{}); } catch(e) {}
       } else {
         dispatch(addFavorite(key));
+        try { favoriteService.addFavorite(item.id).catch(()=>{}); } catch(e) {}
       }
     },
     [dispatch, favorites],

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Row, Col, Card, Tag, Button, Divider, List } from "antd";
+import { Row, Col, Card, Tag, Button, Divider, List, Spin, Alert } from "antd";
 import { DeleteOutlined, InboxOutlined } from "@ant-design/icons";
 import {
   readDashboardSubmissions,
@@ -25,42 +25,46 @@ const formatDate = (value) => {
 };
 
 function UserDashboardPage() {
-  const [submissions, setSubmissions] = useState(() => readDashboardSubmissions());
-  const [inquiries, setInquiries] = useState(() => readInquiries());
-  const [visits, setVisits] = useState(() => readVisits());
-  const [savedSearches, setSavedSearches] = useState(() => readSavedSearches());
-
-  const [notificationsState, setNotificationsState] = useState(() => []);
+  const [submissions, setSubmissions] = useState([]);
+  const [inquiries, setInquiries] = useState([]);
+  const [visits, setVisits] = useState([]);
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [notificationsState, setNotificationsState] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const refreshSubmissions = () => setSubmissions(readDashboardSubmissions());
 
   useEffect(() => {
-    refreshSubmissions();
-
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const handleStorageUpdate = () => refreshSubmissions();
-    window.addEventListener("rms-dashboard-update", handleStorageUpdate);
-
-    const onInquiries = () => setInquiries(readInquiries());
-    const onVisits = () => setVisits(readVisits());
-    const onSavedSearches = () => setSavedSearches(readSavedSearches());
-    const onNotifications = () => setNotificationsState(readStoredNotifications([]));
-
-    window.addEventListener('rms-property-inquiries-updated', onInquiries);
-    window.addEventListener('rms-property-visits-updated', onVisits);
-    window.addEventListener('rms-saved-searches-updated', onSavedSearches);
-    window.addEventListener('rms-notifications-updated', onNotifications);
-
-    return () => {
-      window.removeEventListener("rms-dashboard-update", handleStorageUpdate);
-      window.removeEventListener('rms-property-inquiries-updated', onInquiries);
-      window.removeEventListener('rms-property-visits-updated', onVisits);
-      window.removeEventListener('rms-saved-searches-updated', onSavedSearches);
-      window.removeEventListener('rms-notifications-updated', onNotifications);
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // submissions from backend
+        const api = await import('../services/api');
+        const subsRes = await api.request('/contact?type=Dashboard');
+        const subs = subsRes?.data || subsRes?.data === undefined ? (subsRes?.data || subsRes?.data === undefined ? subsRes : subsRes) : [];
+        // inquiries, visits and saved searches via utils/services
+        const [inq, v, saved] = await Promise.all([readInquiries(), readVisits(), readSavedSearches()]);
+        const notifications = [];
+        if (!mounted) return;
+        setSubmissions(Array.isArray(subs) ? subs : (subsRes?.data || []));
+        setInquiries(inq || []);
+        setVisits(v || []);
+        setSavedSearches(saved || []);
+        setNotificationsState(notifications);
+      } catch (e) {
+        console.error('UserDashboard load failed', e);
+        if (mounted) setError('Unable to load dashboard data');
+      } finally {
+        if (mounted) setLoading(false);
+      }
     };
+
+    load();
+
+    return () => { mounted = false; };
   }, []);
 
   const stats = useMemo(() => {
@@ -132,10 +136,16 @@ function UserDashboardPage() {
 
         <Divider />
 
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+        ) : error ? (
+          <Alert type="error" message={error} style={{ marginBottom: 16 }} />
+        ) : null}
+
         <Row gutter={[16,16]}>
           <Col xs={24} lg={8}>
             <Card title="My Inquiries">
-              <List dataSource={readInquiries().slice(0,8)} renderItem={(item) => (
+              <List dataSource={(inquiries || []).slice(0,8)} renderItem={(item) => (
                 <List.Item>
                   <div><strong>{item.propertyTitle || '—'}</strong><div style={{ fontSize: 12 }}>{item.name} — {item.status}</div></div>
                 </List.Item>
@@ -144,7 +154,7 @@ function UserDashboardPage() {
           </Col>
           <Col xs={24} lg={8}>
             <Card title="My Visit Requests">
-              <List dataSource={readVisits().slice(0,8)} renderItem={(item) => (
+              <List dataSource={(visits || []).slice(0,8)} renderItem={(item) => (
                 <List.Item>
                   <div><strong>{item.propertyTitle || '—'}</strong><div style={{ fontSize: 12 }}>{item.name} — {item.status}</div></div>
                 </List.Item>
@@ -153,7 +163,7 @@ function UserDashboardPage() {
           </Col>
           <Col xs={24} lg={8}>
             <Card title="My Saved Searches">
-              <List dataSource={readSavedSearches().slice(0,8)} renderItem={(item) => (
+              <List dataSource={(savedSearches || []).slice(0,8)} renderItem={(item) => (
                 <List.Item>
                   <div><strong>{item.name}</strong><div style={{ fontSize: 12 }}>{JSON.stringify(item.filters)}</div></div>
                 </List.Item>

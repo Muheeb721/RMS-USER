@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Table, List, Tag, Button } from "antd";
+import { Row, Col, Card, Table, List, Tag, Button, Select, Spin, Alert } from "antd";
 import { adminMetrics, bookings } from "../data/dummyData";
-import { read as readPayments } from '../utils/paymentsStorage.jsx';
+import { getPayments } from '../services/paymentsService.jsx';
 import "./AdminDashboardPage.css";
 import { useProperties } from "../contexts/PropertyContext";
 import { read as readInquiries, update as updateInquiry } from '../utils/propertyInquiriesStorage.jsx';
@@ -14,7 +14,6 @@ import { read as readVerifications, setVerified } from '../utils/propertyVerific
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { toast } from 'react-toastify';
-import { Select } from 'antd';
 
 const columns = [
   { title: "Booking ID", dataIndex: "id", key: "id" },
@@ -23,32 +22,55 @@ const columns = [
   { title: "Status", dataIndex: "status", key: "status" },
 ];
 
-const paymentColumns = [
-  { title: "Payment ID", dataIndex: "id", key: "id" },
-  { title: "Client", dataIndex: "client", key: "client" },
-  { title: "Amount", dataIndex: "amount", key: "amount" },
-  { title: "Status", dataIndex: "status", key: "status" },
-];
+export default function AdminDashboardPage() {
+  const { properties, setPropertyStatus: setStatus, setPropertyVerified: setVerifiedInContext } = useProperties();
 
-function AdminDashboardPage() {
-  const { properties, setPropertyStatus: setStatus, setPropertyVerified: setVerifiedInContext, getPropertyViewCount } = useProperties();
-
-  const [inquiries, setInquiries] = useState(() => readInquiries());
-  const [visits, setVisits] = useState(() => readVisits());
-  const views = readViews();
-  const [priceHistory, setPriceHistory] = useState(() => readPriceHistory());
-  const [verifications, setVerifications] = useState(() => readVerifications());
+  const [inquiries, setInquiries] = useState([]);
+  const [visits, setVisits] = useState([]);
+  const [views, setViews] = useState({});
+  const [priceHistory, setPriceHistory] = useState([]);
+  const [verifications, setVerifications] = useState({});
+  const [storedPayments, setStoredPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const onInquiries = () => setInquiries(readInquiries());
-    const onVisits = () => setVisits(readVisits());
-    const onPrice = () => setPriceHistory(readPriceHistory());
-    const onVerifications = () => setVerifications(readVerifications());
+    const onInquiries = async () => { try { const d = await readInquiries(); setInquiries(d || []); } catch (e) { console.warn(e); } };
+    const onVisits = async () => { try { const d = await readVisits(); setVisits(d || []); } catch (e) { console.warn(e); } };
+    const onPrice = async () => { try { const d = await readPriceHistory(); setPriceHistory(d || []); } catch (e) { console.warn(e); } };
+    const onVerifications = async () => { try { const d = await readVerifications(); setVerifications(d || {}); } catch (e) { console.warn(e); } };
 
     window.addEventListener('rms-property-inquiries-updated', onInquiries);
     window.addEventListener('rms-property-visits-updated', onVisits);
     window.addEventListener('rms-price-history-updated', onPrice);
     window.addEventListener('rms-property-verification-updated', onVerifications);
+
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [loadedInquiries, loadedVisits, loadedViews, loadedPriceHistory, loadedVerifications] = await Promise.all([
+          readInquiries(), readVisits(), readViews(), readPriceHistory(), readVerifications(),
+        ]);
+        setInquiries(loadedInquiries || []);
+        setVisits(loadedVisits || []);
+        setViews(loadedViews || {});
+        setPriceHistory(loadedPriceHistory || []);
+        setVerifications(loadedVerifications || {});
+      } catch (e) {
+        console.warn('Failed to load admin data', e);
+        setError('Failed to load admin data');
+      }
+
+      try {
+        const payments = await getPayments();
+        setStoredPayments(payments || []);
+      } catch (e) {
+        console.warn('Failed to load payments', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
 
     return () => {
       window.removeEventListener('rms-property-inquiries-updated', onInquiries);
@@ -59,57 +81,44 @@ function AdminDashboardPage() {
   }, []);
 
   const totalProperties = properties.length;
-  const storedPayments = readPayments();
   const totalPaymentsCount = storedPayments.length;
   const totalRevenue = storedPayments.reduce((s, p) => s + Number(p.amountPaid || 0), 0);
   const pendingPaymentsCount = storedPayments.filter((p) => p.status === 'Pending').length;
   const partialPaymentsCount = storedPayments.filter((p) => p.status === 'Partial Payment').length;
   const overduePaymentsCount = storedPayments.filter((p) => p.status === 'Overdue').length;
   const totalOutstanding = storedPayments.reduce((s, p) => s + Number(p.remainingAmount || 0), 0);
+
   const available = properties.filter((p) => (p.status || p.availability) === 'Available').length;
   const reserved = properties.filter((p) => (p.status || p.availability) === 'Reserved').length;
   const sold = properties.filter((p) => (p.status || p.availability) === 'Sold').length;
   const forRent = properties.filter((p) => (p.status || p.availability) === 'For Rent').length;
   const totalInquiries = inquiries.length;
   const pendingVisits = visits.filter((v) => v.status === 'Pending').length;
-
-  // favorites aggregation (scan localStorage keys that match rms_favorites_*)
-  let totalFavorites = 0;
-  try {
-    if (typeof window !== 'undefined') {
-      const keys = Object.keys(window.localStorage || {}).filter((k) => k.indexOf('rms_favorites_') === 0);
-      const favCounts = {};
-      keys.forEach((k) => {
-        try {
-          const parsed = JSON.parse(window.localStorage.getItem(k) || '[]');
-          if (Array.isArray(parsed)) {
-            parsed.forEach((id) => { favCounts[String(id)] = (favCounts[String(id)] || 0) + 1; });
-          }
-        } catch (e) {}
-      });
-      totalFavorites = Object.values(favCounts).reduce((a, b) => a + b, 0);
-    }
-  } catch (e) {}
-
-  // most viewed and most favorited property ids
   const mostViewedId = Object.entries(views).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
   const mostViewedProperty = properties.find((p) => String(p.id) === String(mostViewedId));
 
-  const favoriteCounts = {};
-  try {
-    if (typeof window !== 'undefined') {
-      Object.keys(window.localStorage || {}).forEach((k) => {
-        if (k.indexOf('rms_favorites_') !== 0) return;
-        try {
-          const parsed = JSON.parse(window.localStorage.getItem(k) || '[]');
-          if (Array.isArray(parsed)) parsed.forEach((id) => { favoriteCounts[String(id)] = (favoriteCounts[String(id)] || 0) + 1; });
-        } catch (e) {}
-      });
-    }
-  } catch (e) {}
+  const [totalFavorites, setTotalFavorites] = useState(0);
+  const [favoriteCounts, setFavoriteCounts] = useState({});
+  const [mostFavoritedProperty, setMostFavoritedProperty] = useState(null);
 
-  const mostFavoritedId = Object.entries(favoriteCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
-  const mostFavoritedProperty = properties.find((p) => String(p.id) === String(mostFavoritedId));
+  useEffect(() => {
+    let mounted = true;
+    import('../services/api').then(({ default: api }) => {
+      api.request('/favorites/aggregate').then((res) => {
+        if (!mounted) return;
+        if (res && res.success && res.data) {
+          const { totalFavorites: total, byProperty } = res.data;
+          const counts = {};
+          (byProperty || []).forEach((b) => { counts[String(b._id)] = b.count; });
+          setTotalFavorites(total || 0);
+          setFavoriteCounts(counts);
+          const topId = (byProperty || [])[0]?._id || null;
+          if (topId) setMostFavoritedProperty(properties.find((p) => String(p.id) === String(topId)) || null);
+        }
+      }).catch((e) => { console.error('Unable to fetch favorite aggregation', e); });
+    });
+    return () => { mounted = false; };
+  }, [properties]);
 
   const handleInquiryStatus = (id, status) => {
     updateInquiry(id, { status });
@@ -121,7 +130,11 @@ function AdminDashboardPage() {
   };
 
   const handleVisitStatus = (id, status) => {
-    updateVisit(id, { status });
+    (async () => {
+      await updateVisit(id, { status });
+      const updated = await readVisits();
+      setVisits(updated);
+    })();
     try {
       const note = createNotification({ type: 'contact', title: 'Visit Request Updated', message: `Visit ${id} status changed to ${status}` });
       addStoredNotification(note);
@@ -134,6 +147,8 @@ function AdminDashboardPage() {
       <section className="section-card">
         <h2 className="section-title">Admin Dashboard</h2>
         <p className="section-subtitle">Operate users, properties, hostels, bookings, and payments from a single admin console.</p>
+        {loading ? <div style={{ textAlign: 'center', padding: 20 }}><Spin size="large" /></div> : null}
+        {error ? <div style={{ marginBottom: 12 }}><Alert type="error" message={error} /></div> : null}
         <Row gutter={[16, 16]}>
           <Col xs={24} md={4}><Card><strong>{totalProperties}</strong><div>Total Properties</div></Card></Col>
           <Col xs={24} md={4}><Card><strong>{available}</strong><div>Available</div></Card></Col>
@@ -164,8 +179,18 @@ function AdminDashboardPage() {
                     </Select>
                   ) },
                   { title: 'Verified', key: 'verified', render: (_, record) => {
-                    const isVer = Boolean(readVerifications()[String(record.id)]);
-                    return <Button type={isVer ? 'primary' : 'default'} onClick={() => { setVerified(String(record.id), !isVer); setVerifiedInContext(record.id, !isVer); toast.success(isVer ? 'Unverified' : 'Verified'); }}>{isVer ? 'Verified' : 'Verify'}</Button>;
+                    const isVer = Boolean(verifications[String(record.id)]);
+                    return <Button type={isVer ? 'primary' : 'default'} onClick={async () => {
+                      try {
+                        await setVerified(String(record.id), !isVer);
+                        setVerifications((prev) => ({ ...(prev || {}), [String(record.id)]: !isVer }));
+                        setVerifiedInContext(record.id, !isVer);
+                        toast.success(isVer ? 'Unverified' : 'Verified');
+                      } catch (e) {
+                        console.error('Failed to toggle verification', e);
+                        toast.error('Failed to update verification');
+                      }
+                    }}>{isVer ? 'Verified' : 'Verify'}</Button>;
                   } },
                 ]}
               />
@@ -208,5 +233,3 @@ function AdminDashboardPage() {
     </div>
   );
 }
-
-export default AdminDashboardPage;

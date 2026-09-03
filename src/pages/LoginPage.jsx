@@ -1,15 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Form, Input, Button, Checkbox } from 'antd';
 import { FiArrowRight, FiDollarSign, FiHome, FiLock, FiMail, FiShield, FiUsers } from 'react-icons/fi';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { toast } from 'react-toastify';
 import { login, addNotification } from '../redux/store';
 import { createLoginNotification, saveSessionUser } from '../services/notificationService.jsx';
+import authService from '../services/authService';
 import { sanitizeFullName } from '../utils/nameValidation.jsx';
 import './LoginPage.css';
 
 const REMEMBERED_EMAIL_KEY = 'rms_remembered_email';
+
+const resolveDashboardRoute = (role, fallback = '/') => {
+  const normalizedRole = String(role || '').toLowerCase();
+  return ['admin', 'owner', 'manager'].includes(normalizedRole) ? '/admin' : fallback;
+};
 
 const featureHighlights = [
   {
@@ -32,53 +38,73 @@ const featureHighlights = [
 function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
+  const redirectPath = (() => {
+    const params = new URLSearchParams(location.search);
+    const target = params.get('redirect');
+    return target && target.startsWith('/') ? target : '/';
+  })();
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    const savedEmail = window.localStorage.getItem(REMEMBERED_EMAIL_KEY);
-    if (savedEmail) {
-      form.setFieldsValue({ email: savedEmail });
-    }
+    const savedEmail = window.__RMS_REMEMBERED_EMAIL || '';
+    if (savedEmail) form.setFieldsValue({ email: savedEmail });
   }, [form]);
 
-  const handleSubmit = (values) => {
+  const handleSubmit = async (values) => {
     setLoading(true);
 
-    const now = new Date();
-    const normalizedEmail = values.email.trim();
-    const normalizedPassword = typeof values.password === 'string' ? values.password : '';
-    const role = /admin|owner|manager/i.test(normalizedEmail) ? 'admin' : 'resident';
+    try {
+      const normalizedEmail = values.email.trim();
+      const normalizedPassword = typeof values.password === 'string' ? values.password : '';
 
-    if (rememberMe && typeof window !== 'undefined') {
-      window.localStorage.setItem(REMEMBERED_EMAIL_KEY, normalizedEmail);
-    } else if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+      if (rememberMe && typeof window !== 'undefined') {
+        window.__RMS_REMEMBERED_EMAIL = normalizedEmail;
+      } else if (typeof window !== 'undefined') {
+        delete window.__RMS_REMEMBERED_EMAIL;
+      }
+
+      const result = await authService.login(normalizedEmail, normalizedPassword);
+      if (!result || !result.success) {
+        toast.error(result?.message || 'Login failed');
+        setLoading(false);
+        return;
+      }
+
+      const token = result.data?.token;
+      const userData = result.data?.user || {};
+      if (typeof window !== 'undefined' && token) {
+        window.__RMS_AUTH_TOKEN = token;
+        window.__rms_inmemory_token = token;
+      }
+
+      const now = new Date();
+      const sessionUser = saveSessionUser({
+        name: userData.name || sanitizeFullName(normalizedEmail.split('@')[0].replace(/[._-]/g, ' ')) || 'RMS User',
+        email: userData.email || normalizedEmail,
+        role: userData.role || ( /admin|owner|manager/i.test(normalizedEmail) ? 'admin' : 'resident' ),
+        isLoggedIn: true,
+        loginDate: now.toLocaleDateString('en-PK'),
+        loginTime: now.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
+        rememberMe,
+      });
+
+      dispatch(login(sessionUser));
+      dispatch(addNotification(createLoginNotification(sessionUser)));
+      form.resetFields();
+      toast.success(`Welcome back, ${sessionUser.name}!`);
+      const nextRoute = resolveDashboardRoute(sessionUser.role, redirectPath);
+      navigate(nextRoute, { replace: true });
+    } catch (error) {
+      console.error('Login error', error);
+      toast.error('Login failed — please check your credentials.');
+    } finally {
+      setLoading(false);
     }
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('rms_last_login', JSON.stringify({ email: normalizedEmail, password: normalizedPassword, rememberMe }));
-    }
-
-    const user = saveSessionUser({
-      name: sanitizeFullName(values.email.split('@')[0].replace(/[._-]/g, ' ')) || 'RMS User',
-      email: normalizedEmail,
-      role,
-      isLoggedIn: true,
-      loginDate: now.toLocaleDateString('en-PK'),
-      loginTime: now.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
-      rememberMe,
-    });
-
-    dispatch(login(user));
-    dispatch(addNotification(createLoginNotification(user)));
-    form.resetFields();
-    setLoading(false);
-    toast.success(`Welcome back, ${user.name}!`);
-    navigate('/dashboard');
   };
 
   return (

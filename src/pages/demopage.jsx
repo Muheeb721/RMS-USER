@@ -148,86 +148,6 @@ function DemoPage() {
         </div>
 
         <div className="management-layout">
-          <form className="management-form" onSubmit={handleSubmit}>
-            <div className="form-row">
-              <label>
-                Property title
-                <input name="title" value={form.title} onChange={handleChange} placeholder="Luxury family villa" required />
-              </label>
-              <label>
-                Type
-                <select name="type" value={form.type} onChange={handleChange}>
-                  <option value="House">House</option>
-                  <option value="Apartment">Apartment</option>
-                  <option value="Hostel">Hostel</option>
-                  <option value="Room">Room</option>
-                  <option value="Commercial">Commercial</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="form-row">
-              <label>
-                Price
-                <input name="price" value={form.price} onChange={handleChange} placeholder="Rs 85 Lakh" required />
-              </label>
-              <label>
-                Address
-                <input name="address" value={form.address} onChange={handleChange} placeholder="Main Boulevard, Lahore" required />
-              </label>
-            </div>
-
-            <div className="form-row">
-              <label>
-                Area
-                <input name="area" value={form.area} onChange={handleChange} placeholder="DHA Lahore" />
-              </label>
-              <label>
-                Status
-                <select name="status" value={form.status} onChange={handleChange}>
-                  <option value="Available">Available</option>
-                  <option value="Booked">Booked</option>
-                  <option value="Occupied">Occupied</option>
-                  <option value="Pending">Pending</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="form-row">
-              <label>
-                Bedrooms
-                <input type="number" name="bedrooms" value={form.bedrooms} onChange={handleChange} />
-              </label>
-              <label>
-                Bathrooms
-                <input type="number" name="bathrooms" value={form.bathrooms} onChange={handleChange} />
-              </label>
-              <label>
-                Parking
-                <input type="number" name="parking" value={form.parking} onChange={handleChange} />
-              </label>
-            </div>
-
-            <label>
-              Image URL
-              <input name="image" value={form.image} onChange={handleChange} placeholder="https://example.com/photo.jpg" />
-            </label>
-
-            <label>
-              Description
-              <textarea name="description" value={form.description} onChange={handleChange} rows="4" placeholder="Describe the listing" />
-            </label>
-
-            <div className="form-actions">
-              <button type="submit" className="details-button">
-                {editingId ? 'Save changes' : 'Add property'}
-              </button>
-              <button type="button" className="secondary-button" onClick={resetForm}>
-                Reset
-              </button>
-            </div>
-          </form>
-
           <div className="management-preview">
             <h3>Live listings</h3>
             {filteredProperties.map((property) => (
@@ -245,12 +165,7 @@ function DemoPage() {
                   <div className="card-footer">
                     <p className="price">{property.price}</p>
                     <div className="card-actions">
-                      <button type="button" className="secondary-button" onClick={() => handleEdit(property)}>
-                        Edit
-                      </button>
-                      <button type="button" className="details-button" onClick={() => handleDelete(property.id)}>
-                        Delete
-                      </button>
+                      <Link to={`/properties/${property.id}`} className="secondary-button">View</Link>
                     </div>
                   </div>
                 </div>

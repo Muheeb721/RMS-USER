@@ -175,6 +175,13 @@
   height: 220px;
   object-fit: cover;
 }
+
+@media (min-width: 1024px){
+  .property-card img,
+  .hostel-card img {
+    height: 260px;
+  }
+}
 .card-body {
   padding: 16px;
 }

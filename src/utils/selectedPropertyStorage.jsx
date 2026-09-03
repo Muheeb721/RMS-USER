@@ -1,31 +1,33 @@
-const STORAGE_KEY = 'rmsSelectedProperty';
+import apiClient from '../services/apiClient';
 
-export function saveSelectedProperty(obj) {
+export async function saveSelectedProperty(obj) {
   try {
-    if (typeof window === 'undefined') return;
-    const toSave = typeof obj === 'string' ? JSON.parse(obj) : obj;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    const res = await apiClient.put('/users/profile', { profile: { selectedProperty: obj } });
+    return res?.data?.success ? res.data.data?.profile || null : null;
   } catch (e) {
-    try { window.localStorage.setItem(STORAGE_KEY, String(obj)); } catch (err) {}
-  }
-}
-
-export function readSelectedProperty() {
-  try {
-    if (typeof window === 'undefined') return null;
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (e) {
+    console.error('saveSelectedProperty failed', e);
     return null;
   }
 }
 
-export function clearSelectedProperty() {
+export async function readSelectedProperty() {
   try {
-    if (typeof window === 'undefined') return;
-    window.localStorage.removeItem(STORAGE_KEY);
-  } catch (e) {}
+    const res = await apiClient.get('/users/profile');
+    return res?.data?.success ? res.data.data?.profile?.selectedProperty || null : null;
+  } catch (e) {
+    console.error('readSelectedProperty failed', e);
+    return null;
+  }
+}
+
+export async function clearSelectedProperty() {
+  try {
+    const res = await apiClient.put('/users/profile', { profile: {} });
+    return res?.data?.success ? true : false;
+  } catch (e) {
+    console.error('clearSelectedProperty failed', e);
+    return false;
+  }
 }
 
 export default { saveSelectedProperty, readSelectedProperty, clearSelectedProperty };

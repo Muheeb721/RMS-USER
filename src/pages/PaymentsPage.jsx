@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, Tag } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, Tag, Spin, Alert } from 'antd';
 import { getPayments, createPayment } from '../services/paymentsService.jsx';
 import { useSelector, useDispatch } from 'react-redux';
 import { addNotification } from '../redux/store';
@@ -19,12 +19,30 @@ function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    setPayments(getPayments().filter((p) => !user || String(p.userEmail) === String(user.email) || String(p.userId) === String(user.id)));
-    const onUpdate = () => setPayments(getPayments().filter((p) => !user || String(p.userEmail) === String(user.email) || String(p.userId) === String(user.id)));
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const all = await getPayments();
+        if (!mounted) return;
+        setPayments(Array.isArray(all) ? all.filter((p) => !user || String(p.userEmail) === String(user.email) || String(p.userId) === String(user.id)) : []);
+      } catch (e) {
+        console.error('load payments failed', e);
+        if (mounted) setError('Unable to load payments');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    load();
+    const onUpdate = () => load();
     window.addEventListener('rms-payments-updated', onUpdate);
-    return () => window.removeEventListener('rms-payments-updated', onUpdate);
+    return () => { mounted = false; window.removeEventListener('rms-payments-updated', onUpdate); };
   }, [user]);
 
   const submit = (vals) => {
@@ -71,7 +89,13 @@ function PaymentsPage() {
           <Button type="primary" onClick={() => setOpen(true)}>Make a Payment</Button>
         </div>
 
-        <Table dataSource={payments} rowKey={(r) => r.id} columns={columns} pagination={{ pageSize: 8 }} />
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+        ) : error ? (
+          <Alert type="error" message={error} />
+        ) : (
+          <Table dataSource={payments} rowKey={(r) => r.id} columns={columns} pagination={{ pageSize: 8 }} />
+        )}
 
         <Modal open={open} onCancel={() => setOpen(false)} footer={null} title="Make a Payment">
           <Form layout="vertical" form={form} onFinish={submit}>

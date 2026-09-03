@@ -1,5 +1,5 @@
-const SESSION_STORAGE_KEY = 'rms_auth_session';
-const AUTH_DATA_STORAGE_KEY = 'rms_auth_data';
+const SESSION_STORAGE_KEY = '__rms_inmemory_session';
+const AUTH_DATA_STORAGE_KEY = '__rms_inmemory_auth';
 
 const formatDate = (value = new Date()) => {
   const date = typeof value === 'string' ? new Date(value) : value;
@@ -36,37 +36,29 @@ const sanitizeUser = (user = {}) => {
 
 export const saveSessionUser = (user) => {
   const nextUser = sanitizeUser(user);
-
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(nextUser));
-    window.localStorage.setItem(AUTH_DATA_STORAGE_KEY, JSON.stringify(nextUser));
+    // store in-memory only to avoid persisting sensitive data in localStorage
+    window[SESSION_STORAGE_KEY] = nextUser;
+    window[AUTH_DATA_STORAGE_KEY] = nextUser;
   }
-
   return nextUser;
 };
 
 export const readSessionUser = () => {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
+  if (typeof window === 'undefined') return null;
   try {
-    const storedSession = window.localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!storedSession) {
-      return null;
-    }
-
-    return sanitizeUser(JSON.parse(storedSession));
+    const stored = window[SESSION_STORAGE_KEY] || null;
+    return stored ? sanitizeUser(stored) : null;
   } catch (error) {
-    console.error('Unable to read session user from storage:', error);
+    console.error('Unable to read session user from memory:', error);
     return null;
   }
 };
 
 export const clearSessionUser = () => {
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(SESSION_STORAGE_KEY);
-    window.localStorage.removeItem(AUTH_DATA_STORAGE_KEY);
+    delete window[SESSION_STORAGE_KEY];
+    delete window[AUTH_DATA_STORAGE_KEY];
   }
 };
 
@@ -123,6 +115,109 @@ export const createNotification = ({ type, title, message, userName, email, crea
     createdAt: createdDate.toISOString(),
     time: formattedTime,
   };
+};
+
+import apiClient from './apiClient';
+
+export const fetchNotificationsFromServer = async () => {
+  try {
+    const response = await apiClient.get('/notifications');
+    const json = response.data || { data: [] };
+    const items = Array.isArray(json.data) ? json.data : [];
+    const mapped = items.map((it) => {
+      const createdAt = it.createdAt || new Date().toISOString();
+      const date = new Date(createdAt);
+      const time = date.toLocaleString('en-PK', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const typeKey = (it.entityType || it.actionType || 'system').toLowerCase();
+      const accentMap = { rent: 'warning', payment: 'warning', booking: 'info', property: 'success', maintenance: 'maintenance', announcement: 'announcement', contact: 'info', user: 'info' };
+      const iconMap = { warning: '💳', danger: '⚠️', success: '🏠', info: '🏡', maintenance: '🛠️', announcement: '📢' };
+      const accent = accentMap[typeKey] || 'info';
+
+      return {
+        id: it._id || it.id,
+        title: it.title || it.actionType || 'Notification',
+        message: it.message || it.body || '',
+        unread: it.isRead === true ? false : true,
+        type: typeKey,
+        category: (it.entityType || it.actionType || 'General'),
+        createdAt,
+        time,
+        accent,
+        icon: iconMap[accent] || '🔔',
+        actorType: it.actorType,
+        actorName: it.actorName,
+        status: it.status,
+        raw: it,
+      };
+    });
+
+    return { success: true, data: mapped };
+  } catch (error) {
+    console.warn('Unable to fetch notifications from server:', error);
+    return { success: false, data: [] };
+  }
+};
+
+export const markNotificationAsReadOnServer = async (id) => {
+  try {
+    const res = await apiClient.post(`/notifications/${id}/read`);
+    const it = res?.data?.data || null;
+    const mapped = it ? {
+      id: it._id || it.id,
+      title: it.title,
+      message: it.message,
+      unread: it.isRead === true ? false : true,
+      type: (it.entityType || it.actionType || 'system').toLowerCase(),
+      createdAt: it.createdAt,
+      raw: it,
+    } : null;
+    return { success: true, data: mapped };
+  } catch (error) {
+    console.warn('Mark notification read failed:', error);
+    return { success: false };
+  }
+};
+
+export const getUnreadCountFromServer = async () => {
+  try {
+    const res = await apiClient.get('/notifications/count');
+    return { success: true, data: res.data.data || { count: 0 } };
+  } catch (error) {
+    console.warn('Get unread count failed:', error);
+    return { success: false, data: { count: 0 } };
+  }
+};
+
+export const markAllNotificationsOnServer = async () => {
+  try {
+    await apiClient.post('/notifications/mark-all-read');
+    return { success: true };
+  } catch (error) {
+    console.warn('Mark all notifications read failed:', error);
+    return { success: false };
+  }
+};
+
+export const deleteNotificationOnServer = async (id) => {
+  try {
+    await apiClient.delete(`/notifications/${id}`);
+    return { success: true };
+  } catch (error) {
+    console.warn('Delete notification failed:', error);
+    return { success: false };
+  }
+};
+
+export const createNotificationOnServer = async (payload = {}) => {
+  try {
+    // backend admin create route is /api/notifications/create
+    const res = await apiClient.post('/notifications/create', payload);
+    const it = res?.data?.data || null;
+    return { success: true, data: it };
+  } catch (error) {
+    console.warn('Create notification on server failed:', error);
+    return { success: false };
+  }
 };
 
 export const createLoginNotification = (user) =>

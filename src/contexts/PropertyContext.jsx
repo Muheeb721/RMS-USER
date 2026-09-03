@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { propertyData as initialPropertyData } from "../data/dummyData";
+import propertyService from '../services/propertyService';
 import { recordDashboardSubmission } from '../utils/dashboardSubmissionStorage.jsx';
 import { add as addPriceHistory } from '../utils/priceHistoryStorage.jsx';
 import { setVerified as setVerifiedStorage, isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage.jsx';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
-import { increment as incrementPropertyView, getCount as getPropertyViewCount } from "../utils/propertyViewsStorage.jsx";
+import { increment as incrementPropertyView, getCount as getPropertyViewCount } from '../utils/propertyViewsStorage.jsx';
+import { recordAdminAction } from '../services/adminActivityService.jsx';
 
 const STORAGE_KEY = "rms_properties";
 const FALLBACK_IMAGE =
@@ -21,6 +23,9 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
 
   const image = item.image || images[0] || FALLBACK_IMAGE;
 
+  const rawStatus = item.status || item.availability || item.availabilityStatus || 'Available';
+  const normalizedStatus = String(rawStatus).trim();
+
   return {
     id: item.id ?? fallbackId,
     source: 'property',
@@ -31,14 +36,19 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
     rentPrice: item.rentPrice || item.price || "",
     salePrice: item.salePrice || "",
     type: item.type || "Property",
+    transactionType: (
+      item.transactionType ||
+      (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : undefined)) ||
+      (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : 'Sale'))
+    ),
     location: item.location || item.address || "Lahore",
     address: item.address || item.location || "Lahore",
     area: item.area || "Lahore",
     bedrooms: item.bedrooms ?? 0,
     bathrooms: item.bathrooms ?? 0,
     parking: item.parking ?? 1,
-    status: item.status || item.availability || "Available",
-    availability: item.availability || item.status || "Available",
+    status: normalizedStatus === 'Available Now' ? 'Available' : normalizedStatus === 'Ready' ? 'Available' : normalizedStatus === 'Soon Available' ? 'Available' : normalizedStatus,
+    availability: normalizedStatus === 'Available Now' ? 'Available' : normalizedStatus === 'Ready' ? 'Available' : normalizedStatus === 'Soon Available' ? 'Available' : normalizedStatus,
     amenities: Array.isArray(item.amenities) ? item.amenities : [],
     contact: item.contact || "+92 300 1234567",
     owner: item.owner || "RMS Admin",
@@ -47,31 +57,34 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
     lat: item.lat ?? 31.5204,
     lng: item.lng ?? 74.3587,
     category: item.category || "Featured",
+    verificationStatus: item.verificationStatus || 'Unverified',
+    verified: Boolean(item.verified || item.verificationStatus === 'Verified'),
+    views: Number(item.views || 0),
+    favorites: Number(item.favorites || 0),
+    demandScore: Number(item.demandScore || 0),
   };
 };
 
 const getInitialProperties = () => {
-  if (typeof window === "undefined") {
-    return initialPropertyData.map((item, index) =>
-      normalizeProperty(item, index + 1),
-    );
-  }
+  // start with local fallback so UI remains functional until API responds
+  return initialPropertyData.map((item, index) => normalizeProperty(item, index + 1));
+};
 
+const decodeTokenPayload = () => {
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length) {
-        return parsed.map((item, index) => normalizeProperty(item, index + 1));
-      }
-    }
+    const token = typeof window !== 'undefined' ? window.__RMS_AUTH_TOKEN || '' : '';
+    if (!token || !token.includes('.')) return null;
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+    return JSON.parse(atob(padded));
   } catch (error) {
-    console.error("Unable to load saved properties:", error);
+    return null;
   }
+};
 
-  return initialPropertyData.map((item, index) =>
-    normalizeProperty(item, index + 1),
-  );
+const isAdminSession = () => {
+  const payload = decodeTokenPayload();
+  return Boolean(payload && String(payload.role || '').toLowerCase() === 'admin');
 };
 
 const PropertyContext = createContext(null);
@@ -79,20 +92,49 @@ const PropertyContext = createContext(null);
 export function PropertyProvider({ children }) {
   const [properties, setProperties] = useState(getInitialProperties);
 
+  // no persistent localStorage writes for properties; data should come from backend via API
+
+  // fetch properties from backend on mount, replacing local data when available
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(properties));
-    }
-  }, [properties]);
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await propertyService.listProperties();
+        if (mounted && res && res.success && Array.isArray(res.data)) {
+          setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1)));
+        }
+      } catch (e) {
+        // keep fallback local data
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const value = useMemo(
     () => ({
       properties,
-      addProperty: (property) => {
+      addProperty: async (property) => {
+        if (!isAdminSession()) {
+          console.warn('Only admin users can add property listings.');
+          return null;
+        }
+
         const nextProperty = normalizeProperty(
           { ...property, id: property.id || Date.now() },
           Date.now(),
         );
+        // attempt to create on server
+        try {
+          const res = await propertyService.createProperty(property);
+          if (res && res.success) {
+            const created = res.data;
+            const normalized = normalizeProperty(created, created._id || Date.now());
+            setProperties((prev) => [normalized, ...prev]);
+            return normalized;
+          }
+        } catch (e) {
+          // fallback to local
+        }
         setProperties((prev) => [nextProperty, ...prev]);
         recordDashboardSubmission({
           id: `property-${nextProperty.id}`,
@@ -112,83 +154,71 @@ export function PropertyProvider({ children }) {
         });
         return nextProperty;
       },
-      updateProperty: (id, updates) => {
-        setProperties((prev) =>
-          prev.map((item) => {
-            if (item.id !== id) return item;
+      updateProperty: async (id, updates) => {
+        if (!isAdminSession()) {
+          console.warn('Only admin users can update property listings.');
+          return null;
+        }
 
-            const nextImages =
-              Array.isArray(updates.images) && updates.images.length
-                ? updates.images
-                : Array.isArray(item.images) && item.images.length
-                  ? item.images
-                  : [item.image];
-
-            // preserve price history when price changes
-            const prevPrice = item.price;
-            const nextPrice = updates.price ?? updates.salePrice ?? updates.rentPrice ?? prevPrice;
-            if (nextPrice !== prevPrice) {
-              try {
-                addPriceHistory({ propertyId: id, previousPrice: prevPrice, newPrice: nextPrice, changedAt: new Date().toISOString() });
-                try {
-                  const note = createNotification({ type: 'announcement', title: 'Price Changed', message: `${item.title || 'Property'}: ${prevPrice} → ${nextPrice}` });
-                  addStoredNotification(note);
-                } catch (e) {}
-              } catch (e) {
-                console.error('unable to record price history', e);
-              }
-            }
-
-            // update verification state if provided
-            if (typeof updates.verified !== 'undefined') {
-              try {
-                setVerifiedStorage(id, Boolean(updates.verified));
-              } catch (e) {
-                console.error('unable to set verification', e);
-              }
-            }
-
-            return normalizeProperty(
-              {
-                ...item,
-                ...updates,
-                id,
-                image: updates.image || item.image || nextImages[0],
-                images: nextImages,
-                amenities: Array.isArray(updates.amenities)
-                  ? updates.amenities
-                  : typeof updates.amenities === "string"
-                    ? updates.amenities
-                        .split(",")
-                        .map((entry) => entry.trim())
-                        .filter(Boolean)
-                    : item.amenities || [],
-                status:
-                  updates.status ||
-                  item.status ||
-                  item.availability ||
-                  "Available",
-                availability:
-                  updates.availability ||
-                  updates.status ||
-                  item.availability ||
-                  item.status ||
-                  "Available",
-              },
-              id,
-            );
-          }),
-        );
-      },
-      setPropertyStatus: (id, status) => {
-        setProperties((prev) => prev.map((p) => (p.id === id ? { ...p, status, availability: status } : p)));
+        // try to update on server
         try {
-          const prop = properties.find((p) => p.id === id);
+          const res = await propertyService.updateProperty(id, updates);
+          if (res && res.success) {
+            const prop = normalizeProperty(res.data, res.data._id || id);
+            setProperties((prev) => prev.map((p) => (String(p.id) === String(id) ? prop : p)));
+            return prop;
+          }
+        } catch (e) {
+          console.warn('Server update failed, falling back to local update', e);
+        }
+        // local fallback
+        setProperties((prev) => prev.map((item) => (item.id !== id ? item : normalizeProperty({ ...item, ...updates, id }, id))));
+      },
+      setPropertyStatus: async (id, status) => {
+        if (!isAdminSession()) {
+          console.warn('Only admin users can change property status.');
+          return null;
+        }
+
+        const prop = properties.find((p) => p.id === id);
+        const previousStatus = prop?.status || 'Available';
+        // try server update
+        try {
+          const res = await propertyService.updateProperty(id, { status });
+          if (res && res.success) {
+            const updated = normalizeProperty(res.data, res.data._id || id);
+            setProperties((prev) => prev.map((p) => (String(p.id) === String(id) ? updated : p)));
+          } else {
+            setProperties((prev) => prev.map((p) => (p.id === id ? { ...p, status, availability: status } : p)));
+          }
+        } catch (e) {
+          setProperties((prev) => prev.map((p) => (p.id === id ? { ...p, status, availability: status } : p)));
+        }
+        try {
+          await recordAdminAction({
+            actionType: 'PROPERTY_STATUS_CHANGED',
+            entityType: 'PROPERTY',
+            entityId: id,
+            userId: prop?.ownerId || '',
+            userName: prop?.owner || 'Property Owner',
+            propertyName: prop?.title || 'Property',
+            previousStatus,
+            newStatus: status,
+            message: `${prop?.title || 'Property'} status updated to ${status}.`,
+            reason: 'Property status was updated by admin review.',
+            description: `Admin changed property status for ${prop?.title || 'property'} to ${status}`,
+          });
+        } catch (e) {}
+        try {
           const note = createNotification({ type: 'announcement', title: 'Property Status Changed', message: `${prop?.title || 'Property'} status updated to ${status}` });
           addStoredNotification(note);
         } catch (e) {}
       },
       setPropertyVerified: (id, verified) => {
+        if (!isAdminSession()) {
+          console.warn('Only admin users can verify properties.');
+          return;
+        }
         try {
           setVerifiedStorage(id, Boolean(verified));
         } catch (e) {
@@ -204,6 +234,10 @@ export function PropertyProvider({ children }) {
       },
       getPropertyViewCount: (id) => getPropertyViewCount(id),
       deleteProperty: (id) => {
+        if (!isAdminSession()) {
+          console.warn('Only admin users can delete property listings.');
+          return;
+        }
         setProperties((prev) => prev.filter((item) => item.id !== id));
       },
     }),

@@ -1,0 +1,108 @@
+:root{
+  --hr-bg: #F7F9F8;
+  --hr-primary: #0b2450;
+  --hr-accent: #28b463;
+  --hr-accent-2: #d4b35b;
+  --muted: #667085;
+}
+.hr-hero{ background: transparent; padding: 28px 0 }
+.hr-hero-inner{ display:flex; gap:24px; align-items:center; justify-content:space-between }
+.hr-hero-copy{ flex:1; max-width:720px }
+.hr-chip{ display:inline-block; background:rgba(40,180,99,0.08); color:var(--hr-accent); padding:6px 10px; border-radius:999px; font-weight:700; font-size:12px }
+.hr-title{ font-size: clamp(1.8rem, 3vw, 2.6rem); margin:12px 0 12px; color:var(--hr-primary); font-weight:800 }
+.hr-sub{ color:var(--muted); margin-bottom:18px }
+.hr-cta{ display:flex; gap:12px }
+.hr-hero-image{ width:420px; perspective: 1200px; position: relative; }
+.hr-image{
+  width:100%;
+  height:280px;
+  border-radius:24px;
+  background-image: url('https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80');
+  background-size:cover;
+  background-position:center;
+  box-shadow: 0 24px 60px rgba(11,36,80,0.14), 0 12px 24px rgba(11,36,80,0.08);
+  border: 1px solid rgba(255,255,255,0.7);
+  transform-style: preserve-3d;
+  transform: rotateX(8deg) rotateY(-12deg) translateY(0);
+  animation: heroFloat3d 7s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.5s ease, box-shadow 0.5s ease, filter 0.5s ease;
+}
+
+.hr-hero-image:hover .hr-image {
+  transform: rotateX(4deg) rotateY(8deg) translateY(-10px) scale(1.02);
+  box-shadow: 0 32px 80px rgba(11,36,80,0.18), 0 18px 28px rgba(11,36,80,0.12);
+  filter: saturate(1.08);
+}
+
+.hr-image::before{
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 40%, rgba(40,180,99,0.08));
+  transform: translateZ(24px);
+}
+
+.hr-image::after{
+  content: "";
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 110px;
+  height: 80px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255,255,255,0.38);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 14px 26px rgba(11,36,80,0.12);
+  transform: translateZ(36px);
+}
+
+@keyframes heroFloat3d {
+  0% { transform: rotateX(8deg) rotateY(-12deg) translateY(0px); }
+  50% { transform: rotateX(5deg) rotateY(8deg) translateY(-10px); }
+  100% { transform: rotateX(8deg) rotateY(-12deg) translateY(0px); }
+}
+
+.hr-search-card{ margin-top:-28px; background:#fff; border-radius:12px; padding:16px; box-shadow:0 12px 36px rgba(11,36,80,0.06); display:flex; align-items:center; gap:12px; max-width:1100px; margin-left:auto; margin-right:auto }
+.search-title{ margin:0 0 6px 0; font-weight:800 }
+.search-row{ display:flex; gap:10px; align-items:center; width:100% }
+
+.hr-section{ background:transparent; padding:28px 0 }
+.section-title{ margin:0; font-size:1.2rem; font-weight:800 }
+.section-sub{ margin:6px 0 0; color:var(--muted) }
+
+.why-card{ display:flex; flex-direction:column; gap:10px; align-items:flex-start }
+.why-icon{ font-size:28px; color:var(--hr-accent) }
+
+.step-card{ display:flex; gap:12px; align-items:flex-start }
+.step-index{ font-weight:800; color:var(--hr-primary); font-size:18px; background:#fff; padding:6px 10px; border-radius:8px }
+
+.hr-cta-section{ background:linear-gradient(180deg,#fff,#fbfdfb); padding:22px; border-radius:12px; margin-top:20px }
+.hr-cta-inner{ display:flex; align-items:center; justify-content:space-between; gap:12px }
+.hr-cta-actions{ display:flex; gap:12px }
+
+.btn-primary{ background: var(--hr-accent); color: #fff; padding: 10px 16px; border-radius:8px; display:inline-flex; align-items:center; gap:8px; font-weight:700 }
+.btn-secondary{ background: transparent; color: var(--hr-primary); border: 1px solid rgba(11,36,80,0.06); padding: 10px 14px; border-radius:8px; font-weight:700 }
+
+@media (min-width: 1024px){
+  .hr-image{ height: 340px }
+  .property-card img{ height: 260px }
+}
+
+.hr-footer{ margin-top:28px; padding:20px 0; border-top:1px solid rgba(11,36,80,0.04) }
+.hr-footer-inner{ display:flex; gap:24px; justify-content:space-between; align-items:flex-start }
+.hr-links a{ display:block; margin:6px 0; color:var(--muted) }
+
+@media (max-width: 900px){
+  .hr-hero-inner{ flex-direction:column }
+  .hr-hero-image{ width:100% }
+  .hr-image{ height:220px }
+  .hr-search-card{ margin-top:12px; flex-direction:column; align-items:stretch }
+  .hr-cta-inner{ flex-direction:column; align-items:flex-start }
+}
+
+/* ensure no accidental horizontal overflow inside hero */
+.hr-hero, .hr-hero-inner { max-width: 1100px; margin-left: auto; margin-right: auto }
+

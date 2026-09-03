@@ -3,6 +3,7 @@ import { Table, Button, Tag, Modal, Form, Input, Select, DatePicker } from 'antd
 import { getPayments, updatePayment, deletePayment } from '../services/paymentsService.jsx';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
+import { recordAdminAction } from '../services/adminActivityService.jsx';
 
 const statusColor = (s) => {
   if (!s) return 'default';
@@ -43,8 +44,36 @@ function AdminPaymentsPage() {
     ) },
   ];
 
-  const saveEdit = (vals) => {
+  const saveEdit = async (vals) => {
+    const previous = editing?.status || 'Pending';
     updatePayment(editing.id, { ...vals });
+
+    const actionType = vals.status === 'Paid' ? 'PAYMENT_APPROVED' : vals.status === 'Rejected' ? 'PAYMENT_REJECTED' : 'PAYMENT_UPDATED';
+    const message = vals.status === 'Paid' ? `Your payment for ${editing.propertyName || 'the property'} has been confirmed by the admin.` : vals.status === 'Rejected' ? `Your payment for ${editing.propertyName || 'the property'} was rejected by the admin.` : `Your payment status for ${editing.propertyName || 'the property'} was updated by the admin.`;
+
+    await recordAdminAction({
+      actionType,
+      entityType: 'PAYMENT',
+      entityId: editing.id,
+      userId: editing.userId || editing.userEmail,
+      userName: editing.userName,
+      propertyName: editing.propertyName,
+      previousStatus: previous,
+      newStatus: vals.status || editing.status,
+      message,
+      reason: vals.status === 'Rejected' ? 'Payment review failed verification.' : 'Payment status updated by admin.',
+      description: `Admin updated payment ${editing.id}`,
+    });
+
+    const note = createNotification({
+      type: 'payment',
+      title: vals.status === 'Paid' ? 'Payment Confirmed' : vals.status === 'Rejected' ? 'Payment Rejected' : 'Payment Updated',
+      message,
+      userName: editing.userName,
+      email: editing.userEmail,
+    });
+    addStoredNotification(note);
+
     setEditing(null);
   };
 

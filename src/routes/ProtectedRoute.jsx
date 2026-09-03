@@ -1,9 +1,16 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 function ProtectedRoute() {
-  const { user } = useSelector((state) => state.auth);
-  return user?.isLoggedIn ? <Outlet /> : <Navigate to="/login" replace />;
+  const location = useLocation();
+  const { isAuthenticated, user } = useAuth();
+
+  if (!isAuthenticated && !user?.isLoggedIn) {
+    const target = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?redirect=${target}`} replace />;
+  }
+
+  return <Outlet />;
 }
 
 export default ProtectedRoute;

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
+import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
 
 const emptyForm = {
   title: '',
@@ -19,6 +20,7 @@ const emptyForm = {
 };
 
 function ApartmentsDemoPage() {
+  const navigate = useNavigate();
   const { properties, addProperty, updateProperty, deleteProperty } = useProperties();
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -96,6 +98,16 @@ function ApartmentsDemoPage() {
     if (editingId === id) resetForm();
   };
 
+  const handleViewProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(property.id ? `/properties/${property.id}` : '/contact');
+  };
+
+  const handleReserveProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(`/contact?propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`);
+  };
+
   return (
     <div className="demo-page">
       <header className="demo-header">
@@ -124,51 +136,9 @@ function ApartmentsDemoPage() {
           <span className="section-count">{aptProperties.length} apartment records</span>
         </div>
 
-        <div className="management-layout">
-          <form className="management-form" onSubmit={handleSubmit}>
-            <div className="form-row">
-              <label>
-                Property title
-                <input name="title" value={form.title} onChange={handleChange} placeholder="Modern apartment" required />
-              </label>
-              <label>
-                Type
-                <select name="type" value={form.type} onChange={handleChange}>
-                  <option value="Apartment">Apartment</option>
-                  <option value="Flat">Flat</option>
-                </select>
-              </label>
-            </div>
-
-            <div className="form-row">
-              <label>
-                Price
-                <input name="price" value={form.price} onChange={handleChange} placeholder="Rs 62 Lakh" required />
-              </label>
-              <label>
-                Address
-                <input name="address" value={form.address} onChange={handleChange} placeholder="Bahria Town" required />
-              </label>
-            </div>
-
-            <label>
-              Image URL
-              <input name="image" value={form.image} onChange={handleChange} placeholder="https://example.com/photo.jpg" />
-            </label>
-
-            <label>
-              Description
-              <textarea name="description" value={form.description} onChange={handleChange} rows="4" placeholder="Describe the apartment" />
-            </label>
-
-            <div className="form-actions">
-              <button type="submit" className="details-button">{editingId ? 'Save changes' : 'Add apartment'}</button>
-              <button type="button" className="secondary-button" onClick={resetForm}>Reset</button>
-            </div>
-          </form>
-
-          <div className="management-preview">
-            <h3>Live apartment listings</h3>
+        <div className="management-preview user-facing">
+          <h3>Apartment listings</h3>
+          <div className="listing-grid">
             {filteredProperties.map((property) => (
               <article className="property-card compact" key={property.id}>
                 <div className="card-image" style={{ backgroundImage: `url(${property.image})` }} />
@@ -182,8 +152,8 @@ function ApartmentsDemoPage() {
                   <div className="card-footer">
                     <p className="price">{property.price}</p>
                     <div className="card-actions">
-                      <button type="button" className="secondary-button" onClick={() => handleEdit(property)}>Edit</button>
-                      <button type="button" className="details-button" onClick={() => handleDelete(property.id)}>Delete</button>
+                      <button type="button" className="secondary-button" onClick={() => handleViewProperty(property)}>View</button>
+                      <button type="button" className="details-button" onClick={() => handleReserveProperty(property)}>Reserve</button>
                     </div>
                     <FavoriteToggle item={property} label="Save" />
                   </div>

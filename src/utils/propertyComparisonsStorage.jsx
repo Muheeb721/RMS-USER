@@ -1,42 +1,42 @@
-const STORAGE_KEY = 'rms_property_comparisons';
+import api from '../services/api';
 
-const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `${fallbackId}-${Math.random().toString(16).slice(2)}`,
+const normalize = (item = {}) => ({
+  id: item._id || item.id || Date.now().toString(),
   name: item.name || `Comparison ${new Date().toLocaleString()}`,
   propertyIds: Array.isArray(item.propertyIds) ? item.propertyIds : [],
   createdAt: item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+export const read = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await api.request('/analytics/comparisons');
+    if (res && res.success && Array.isArray(res.data)) return res.data.map(normalize);
+    return [];
   } catch (e) {
-    console.error('read property comparisons', e);
+    console.error('read comparisons failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-property-comparisons-updated'));
-  return next;
+export const add = async (comparison = {}) => {
+  try {
+    const payload = { name: comparison.name, propertyIds: comparison.propertyIds || [] };
+    const res = await api.request('/analytics/comparisons', { method: 'POST', body: payload });
+    return res && res.success ? normalize(res.data) : null;
+  } catch (e) {
+    console.error('add comparison failed', e);
+    return null;
+  }
 };
 
-const add = (comparison = {}) => {
-  const next = [normalize(comparison, Date.now()), ...read()];
-  return save(next);
+export const remove = async (id) => {
+  try {
+    const res = await api.request(`/analytics/comparisons/${id}`, { method: 'DELETE' });
+    return res && res.success;
+  } catch (e) {
+    console.error('remove comparison failed', e);
+    return false;
+  }
 };
 
-const remove = (id) => {
-  const next = read().filter((item) => item.id !== id);
-  return save(next);
-};
-
-export { read, save, add, remove };
-export default { read, save, add, remove };
+export default { read, add, remove };

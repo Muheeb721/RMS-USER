@@ -1,4 +1,4 @@
-import { Provider } from 'react-redux';
+import { Provider, useDispatch } from 'react-redux';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd';
 import { ToastContainer } from 'react-toastify';
@@ -6,30 +6,70 @@ import 'react-toastify/dist/ReactToastify.css';
 import 'antd/dist/reset.css';
 import { store } from './redux/store';
 import AppRoutes from './routes/AppRoutes';
+import { useEffect } from 'react';
+import { fetchNotificationsFromServer } from './services/notificationService.jsx';
+import favoriteService from './services/favoriteService';
+import { setNotifications, setFavorites } from './redux/store';
 import { PropertyProvider } from './contexts/PropertyContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
+  const AppInner = () => {
+    const dispatch = useDispatch();
+
+    useEffect(() => {
+      const token = typeof window !== 'undefined' ? window.__RMS_AUTH_TOKEN || null : null;
+      if (!token) return;
+
+      (async () => {
+        try {
+          const res = await fetchNotificationsFromServer();
+          if (res && res.success && Array.isArray(res.data)) {
+            dispatch(setNotifications(res.data));
+          }
+        } catch (e) {
+          console.warn('Notification fetch failed on app init', e);
+        }
+        try {
+          const favRes = await favoriteService.listFavorites();
+          if (favRes && favRes.success && Array.isArray(favRes.data)) {
+            const keys = favRes.data.map((f) => `property:${f.propertyId}`);
+            dispatch(setFavorites(keys));
+          }
+        } catch (e) {
+          console.warn('Favorites fetch failed on app init', e);
+        }
+      })();
+    }, [dispatch]);
+
+    return (
+      <AuthProvider>
+        <PropertyProvider>
+          <BrowserRouter>
+            <ConfigProvider
+              theme={{
+                token: {
+                  colorPrimary: '#28b463',
+                  colorInfo: '#123a70',
+                  borderRadius: 16,
+                  fontFamily: 'Inter, Segoe UI, sans-serif',
+                },
+              }}
+            >
+              <AntApp>
+                <AppRoutes />
+                <ToastContainer position="top-right" />
+              </AntApp>
+            </ConfigProvider>
+          </BrowserRouter>
+        </PropertyProvider>
+      </AuthProvider>
+    );
+  };
+
   return (
     <Provider store={store}>
-      <PropertyProvider>
-      <BrowserRouter>
-        <ConfigProvider
-          theme={{
-            token: {
-              colorPrimary: '#28b463',
-              colorInfo: '#123a70',
-              borderRadius: 16,
-              fontFamily: 'Inter, Segoe UI, sans-serif',
-            },
-          }}
-        >
-          <AntApp>
-            <AppRoutes />
-            <ToastContainer position="top-right" />
-          </AntApp>
-        </ConfigProvider>
-      </BrowserRouter>
-      </PropertyProvider>
+      <AppInner />
     </Provider>
   );
 }

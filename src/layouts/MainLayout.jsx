@@ -1,25 +1,35 @@
 import { Layout } from "antd";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useLocation } from "react-router-dom";
+import { useState } from 'react';
 import { motion } from "framer-motion";
 import HeaderNav from "../components/Header";
+// Sidebar removed per request; header will show site-wide
 import "../styles/global.css";
 
 const { Content, Footer } = Layout;
 
 function MainLayout() {
+  const location = useLocation();
+  const showHeader = location.pathname !== "/signup" && location.pathname !== "/signup/";
+  const isAdmin = location.pathname.startsWith('/admin');
+  // no sidebar collapsed state needed when header is primary navigation
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <Layout style={{ minHeight: "100vh", background: "#f6f8fc" }}>
-      <HeaderNav />
+      {showHeader && <HeaderNav />}
 
-      <Content className="page-shell">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-        >
-          <Outlet />
-        </motion.div>
-      </Content>
+      <div className={"main-content"}>
+        <Content className="page-shell">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25 }}
+          >
+            <Outlet />
+          </motion.div>
+        </Content>
+      </div>
 
       <Footer
         style={{

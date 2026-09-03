@@ -1,11 +1,32 @@
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { List, Card, Button } from 'antd';
-import { read as readSavedSearches, remove as removeSavedSearch } from '../utils/savedSearchesStorage';
+import { List, Card, Button, Spin, Alert } from 'antd';
+import { fetchSavedSearches, deleteSavedSearchById } from '../utils/savedSearchesStorage';
 
 function SavedSearchesPage() {
   const navigate = useNavigate();
-  const saved = useMemo(() => readSavedSearches(), []);
+  const [saved, setSaved] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const items = await fetchSavedSearches();
+        if (!mounted) return;
+        setSaved(items || []);
+      } catch (e) {
+        console.error('fetch saved searches failed', e);
+        if (mounted) setError('Unable to load saved searches');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const run = (filters) => {
     const params = new URLSearchParams();
@@ -16,9 +37,11 @@ function SavedSearchesPage() {
     navigate(`/properties?${params.toString()}`);
   };
 
-  const del = (id) => {
-    removeSavedSearch(id);
-    window.dispatchEvent(new Event('rms-saved-searches-updated'));
+  const del = async (id) => {
+    const res = await deleteSavedSearchById(id);
+    if (res && res.success) {
+      setSaved((prev) => prev.filter((s) => String(s.id) !== String(id)));
+    }
   };
 
   return (
@@ -26,11 +49,17 @@ function SavedSearchesPage() {
       <section className="section-card">
         <h2 className="section-title">Saved Searches</h2>
         <p className="section-subtitle">View, run, or delete your saved searches.</p>
-        <List dataSource={saved} renderItem={(item) => (
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+        ) : error ? (
+          <Alert type="error" message={error} />
+        ) : (
+          <List dataSource={saved} renderItem={(item) => (
           <List.Item actions={[<Button key="run" onClick={() => run(item.filters)}>Run</Button>, <Button key="delete" danger onClick={() => del(item.id)}>Delete</Button>] }>
             <List.Item.Meta title={item.name} description={JSON.stringify(item.filters)} />
           </List.Item>
-        )} />
+          )} />
+        )}
       </section>
     </div>
   );

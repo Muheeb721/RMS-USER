@@ -1,5 +1,13 @@
 .topbar {
+  position: relative;
   padding: 0 16px;
+}
+
+.topbar > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .topbar-nav {
@@ -24,6 +32,12 @@
   min-height: 42px;
 }
 
+.dropdown-nav-button {
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
 .top-nav-link:hover,
 .top-nav-link:focus-visible,
 .top-nav-link:active {
@@ -43,8 +57,10 @@
 .topbar-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+  margin-left: auto;
 }
 
 .favorite-badge-link {

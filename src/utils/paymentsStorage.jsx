@@ -1,7 +1,8 @@
-const STORAGE_KEY = 'rms_payments';
+// Payments storage migrated to backend APIs (paymentService).
+import paymentService from '../services/paymentService';
 
-const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `PAY-${fallbackId}-${Math.random().toString(16).slice(2)}`,
+const normalize = (item = {}) => ({
+  id: item._id || item.id || null,
   bookingId: item.bookingId || item.booking?.id || null,
   userId: item.userId || item.user?.id || null,
   userName: item.userName || item.user?.name || item.name || '',
@@ -24,41 +25,53 @@ const normalize = (item = {}, fallbackId = Date.now()) => ({
   updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+const fetchPayments = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await paymentService.myPayments();
+    if (res && res.success && Array.isArray(res.data)) return res.data.map(normalize);
+    return [];
   } catch (e) {
-    console.error('read payments', e);
+    console.error('fetchPayments failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-payments-updated'));
-  return next;
+const createPayment = async (payload) => {
+  try {
+    const res = await paymentService.createPayment(payload);
+    if (res && res.success) return normalize(res.data);
+    throw new Error(res?.message || 'Create payment failed');
+  } catch (e) {
+    console.error('createPayment failed', e);
+    throw e;
+  }
 };
 
-const add = (payment = {}) => {
-  const next = [normalize(payment, Date.now()), ...read()];
-  return save(next);
+// Deprecated synchronous methods
+const read = () => {
+  console.warn('paymentsStorage.read() deprecated: use fetchPayments()');
+  return [];
 };
 
-const update = (id, updates = {}) => {
-  const next = read().map((item) => (item.id === id ? normalize({ ...item, ...updates, updatedAt: new Date().toISOString() }, id) : item));
-  return save(next);
+const save = () => {
+  console.warn('paymentsStorage.save() deprecated: use backend APIs');
+  return [];
 };
 
-const remove = (id) => {
-  const next = read().filter((item) => item.id !== id);
-  return save(next);
+const add = () => {
+  console.warn('paymentsStorage.add() deprecated: use createPayment(payload)');
+  return null;
 };
 
-export { read, save, add, update, remove };
-export default { read, save, add, update, remove };
+const update = () => {
+  console.warn('paymentsStorage.update() deprecated: use payment APIs');
+  return null;
+};
+
+const remove = () => {
+  console.warn('paymentsStorage.remove() deprecated: use payment APIs');
+  return null;
+};
+
+export { fetchPayments, createPayment, read, save, add, update, remove };
+export default { fetchPayments, createPayment };

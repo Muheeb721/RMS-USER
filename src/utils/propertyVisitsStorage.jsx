@@ -1,12 +1,12 @@
-const STORAGE_KEY = 'rms_property_visits';
+import api from '../services/api';
 
-const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `${fallbackId}-${Math.random().toString(16).slice(2)}`,
-  name: item.name || item.fullName || '',
-  phone: item.phone || item.contact || '',
+const normalize = (item = {}) => ({
+  id: item._id || item.id || Date.now().toString(),
+  name: item.fullName || item.name || '',
+  phone: item.phone || '',
   email: item.email || '',
-  propertyId: item.propertyId || item.property?.id || null,
-  propertyTitle: item.propertyTitle || (item.property && item.property.title) || '',
+  propertyId: item.propertyId || null,
+  propertyTitle: item.propertyName || item.propertyTitle || '',
   date: item.date || null,
   time: item.time || null,
   message: item.message || '',
@@ -15,41 +15,56 @@ const normalize = (item = {}, fallbackId = Date.now()) => ({
   updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+export const read = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await api.request('/contact?type=Visit');
+    if (res && res.success && Array.isArray(res.data)) return res.data.map(normalize);
+    return [];
   } catch (e) {
-    console.error('read property visits', e);
+    console.error('read property visits failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-property-visits-updated'));
-  return next;
+export const add = async (visit = {}) => {
+  try {
+    const payload = {
+      fullName: visit.name || visit.fullName,
+      email: visit.email,
+      phone: visit.phone,
+      message: visit.message || '',
+      propertyId: visit.propertyId,
+      propertyName: visit.propertyTitle || visit.propertyName,
+      inquiryType: 'Visit',
+      date: visit.date || null,
+      time: visit.time || null,
+    };
+    const res = await api.request('/contact', { method: 'POST', body: payload });
+    return res && res.success ? normalize(res.data) : null;
+  } catch (e) {
+    console.error('add visit failed', e);
+    return null;
+  }
 };
 
-const add = (visit = {}) => {
-  const next = [normalize(visit, Date.now()), ...read()];
-  return save(next);
+export const update = async (id, updates = {}) => {
+  try {
+    const res = await api.request(`/contact/${id}`, { method: 'PUT', body: updates });
+    return res && res.success ? normalize(res.data) : null;
+  } catch (e) {
+    console.error('update visit failed', e);
+    return null;
+  }
 };
 
-const update = (id, updates = {}) => {
-  const next = read().map((item) => (item.id === id ? normalize({ ...item, ...updates, updatedAt: new Date().toISOString() }, id) : item));
-  return save(next);
+export const remove = async (id) => {
+  try {
+    const res = await api.request(`/contact/${id}`, { method: 'DELETE' });
+    return res && res.success;
+  } catch (e) {
+    console.error('remove visit failed', e);
+    return false;
+  }
 };
 
-const remove = (id) => {
-  const next = read().filter((item) => item.id !== id);
-  return save(next);
-};
-
-export { read, save, add, update, remove };
-export default { read, save, add, update, remove };
+export default { read, add, update, remove };

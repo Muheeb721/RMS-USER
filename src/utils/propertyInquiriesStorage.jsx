@@ -1,7 +1,7 @@
-const STORAGE_KEY = 'rms_property_inquiries';
+import apiClient from '../services/apiClient';
 
 const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `${fallbackId}-${Math.random().toString(16).slice(2)}`,
+  id: item.id || item._id || `${fallbackId}-${Math.random().toString(16).slice(2)}`,
   name: item.name || item.fullName || '',
   phone: item.phone || item.contact || '',
   email: item.email || '',
@@ -14,40 +14,55 @@ const normalize = (item = {}, fallbackId = Date.now()) => ({
   updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+const read = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await apiClient.get('/property-inquiries');
+    const items = res?.data?.success ? res.data.data || [] : [];
+    return Array.isArray(items) ? items.map((p) => normalize(p)) : [];
   } catch (e) {
-    console.error('read property inquiries', e);
+    console.error('read property inquiries failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-property-inquiries-updated'));
-  return next;
+const save = async (records = []) => {
+  try {
+    const res = await apiClient.post('/property-inquiries/batch', { records });
+    return res?.data?.success ? res.data.data || records : records;
+  } catch (e) {
+    console.error('save property inquiries failed', e);
+    return records;
+  }
 };
 
-const add = (inquiry = {}) => {
-  const next = [normalize(inquiry, Date.now()), ...read()];
-  return save(next);
+const add = async (inquiry = {}) => {
+  try {
+    const res = await apiClient.post('/property-inquiries', inquiry);
+    return res?.data?.success ? normalize(res.data.data) : null;
+  } catch (e) {
+    console.error('add property inquiry failed', e);
+    return null;
+  }
 };
 
-const update = (id, updates = {}) => {
-  const next = read().map((item) => (item.id === id ? normalize({ ...item, ...updates, updatedAt: new Date().toISOString() }, id) : item));
-  return save(next);
+const update = async (id, updates = {}) => {
+  try {
+    const res = await apiClient.put(`/property-inquiries/${id}`, updates);
+    return res?.data?.success ? normalize(res.data.data) : null;
+  } catch (e) {
+    console.error('update property inquiry failed', e);
+    return null;
+  }
 };
 
-const remove = (id) => {
-  const next = read().filter((item) => item.id !== id);
-  return save(next);
+const remove = async (id) => {
+  try {
+    const res = await apiClient.delete(`/property-inquiries/${id}`);
+    return res?.data?.success ? true : false;
+  } catch (e) {
+    console.error('remove property inquiry failed', e);
+    return false;
+  }
 };
 
 export { read, save, add, update, remove };

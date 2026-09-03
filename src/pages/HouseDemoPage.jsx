@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
+import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
 
 const categories = ['All', 'House', 'Apartment', 'Room', 'Commercial'];
 
@@ -21,6 +22,7 @@ const emptyForm = {
 };
 
 function HouseDemoPage() {
+  const navigate = useNavigate();
   const { properties, addProperty, updateProperty, deleteProperty } = useProperties();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -114,6 +116,16 @@ function HouseDemoPage() {
     if (editingId === id) {
       resetForm();
     }
+  };
+
+  const handleViewProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(property.id ? `/properties/${property.id}` : '/contact');
+  };
+
+  const handleReserveProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(`/contact?propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`);
   };
 
   return (
@@ -253,11 +265,11 @@ function HouseDemoPage() {
                   <div className="card-footer">
                     <p className="price">{property.price}</p>
                     <div className="card-actions">
-                      <button type="button" className="secondary-button" onClick={() => handleEdit(property)}>
-                        Edit
+                      <button type="button" className="secondary-button" onClick={() => handleViewProperty(property)}>
+                        View
                       </button>
-                      <button type="button" className="details-button" onClick={() => handleDelete(property.id)}>
-                        Delete
+                      <button type="button" className="details-button" onClick={() => handleReserveProperty(property)}>
+                        Reserve
                       </button>
                     </div>
                     <FavoriteToggle item={property} label="Save" />

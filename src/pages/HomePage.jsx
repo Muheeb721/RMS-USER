@@ -12,6 +12,8 @@ import {
   List,
   Modal,
   Form,
+  Spin,
+  Alert,
 } from "antd";
 import {
   SearchOutlined,
@@ -30,63 +32,55 @@ import { useProperties } from "../contexts/PropertyContext";
 import FavoriteToggle from '../components/FavoriteToggle';
 import ChatBot from "../components/ChatBot/ChatBot";
 import "./HomePage.css";
+import "./home-redesign.css";
+import HeroSection from '../components/home/HeroSection';
+import PropertySearch from '../components/home/PropertySearch';
+import FeaturedProperties from '../components/home/FeaturedProperties';
+import WhyChooseRMS from '../components/home/WhyChooseRMS';
+import HowItWorks from '../components/home/HowItWorks';
+import HomeCTA from '../components/home/HomeCTA';
+import HomeFooter from '../components/home/HomeFooter';
 import ActionModal from "../components/ActionModal";
 import { toast } from "react-toastify";
-import {
-  clearDashboardSubmissions,
-  readDashboardSubmissions,
-  removeDashboardSubmission,
-  updateDashboardSubmission,
-} from "../utils/dashboardSubmissionStorage.jsx";
+import RentalBookingModal from '../components/RentalBookingModal';
+// dashboard submissions are handled on the dedicated Dashboard page
 
 function HomePage() {
   const [selectedListing, setSelectedListing] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [dashboardEntries, setDashboardEntries] = useState(() => readDashboardSubmissions());
-  const [dashboardModal, setDashboardModal] = useState(null);
-  const [editForm] = Form.useForm();
+  // removed inline dashboard UI/state from Home page
   const navigate = useNavigate();
   const { properties } = useProperties();
   const { user } = useSelector((state) => state.auth || {});
-
-  const refreshDashboardEntries = () => setDashboardEntries(readDashboardSubmissions());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    refreshDashboardEntries();
-
-    if (typeof window === "undefined") {
-      return undefined;
-    }
-
-    const handleDashboardUpdate = () => refreshDashboardEntries();
-    window.addEventListener("rms-dashboard-update", handleDashboardUpdate);
-
-    return () => {
-      window.removeEventListener("rms-dashboard-update", handleDashboardUpdate);
-    };
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const service = await import('../services/propertyService');
+        await service.listProperties();
+      } catch (e) {
+        console.warn('HomePage property load failed', e);
+        if (mounted) setError('Unable to load properties');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const currentUser = user || {
-    name: "RMS User",
-    email: "",
-    role: "resident",
-  };
+  // dashboard data now lives on /dashboard route
 
-  const userDashboardEntries = useMemo(() => {
-    const list = readDashboardSubmissions();
-    const userEmail = (currentUser.email || "").toLowerCase();
-    const userName = (currentUser.name || "").toLowerCase();
+  const currentUser = user || { name: "RMS User", email: "", role: "resident" };
 
-    if (!userEmail && !userName) {
-      return list;
-    }
+  const [rentalSelected, setRentalSelected] = useState(null);
+  const [rentalBookingOpen, setRentalBookingOpen] = useState(false);
 
-    return list.filter((entry) => {
-      const entryEmail = (entry.email || "").toLowerCase();
-      const entryName = (entry.userName || "").toLowerCase();
-      return !entryEmail || entryEmail === userEmail || entryName === userName;
-    });
-  }, [currentUser.email, currentUser.name, dashboardEntries]);
+  // no inline dashboard entries on home page
 
   const handleNewsletterSignup = () => {
     if (!newsletterEmail.trim()) {
@@ -98,159 +92,145 @@ function HomePage() {
     setNewsletterEmail("");
   };
 
-  const openViewModal = (entry) => setDashboardModal({ type: "view", entry });
-  const openEditModal = (entry) => {
-    setDashboardModal({ type: "edit", entry });
-    editForm.setFieldsValue({
-      title: entry.title || "",
-      location: entry.location || "",
-      price: entry.price || "",
-      description: entry.description || "",
-      status: entry.status || "New",
-    });
-  };
-
-  const handleSaveEdit = () => {
-    editForm.validateFields().then((values) => {
-      if (!dashboardModal?.entry?.id) return;
-
-      updateDashboardSubmission(dashboardModal.entry.id, {
-        title: values.title,
-        location: values.location,
-        price: values.price,
-        description: values.description,
-        status: values.status,
-      });
-
-      refreshDashboardEntries();
-      setDashboardModal(null);
-      editForm.resetFields();
-      toast.success("Submission updated successfully.");
-    });
-  };
-
-  const handleDelete = (id) => {
-    removeDashboardSubmission(id);
-    refreshDashboardEntries();
-    toast.success("Submission removed.");
-  };
-
-  const handleClearAll = () => {
-    clearDashboardSubmissions();
-    refreshDashboardEntries();
-    toast.success("All submissions cleared.");
-  };
+  // dashboard edit/delete handled on the dashboard page
 
   return (
     <div className="page-shell home-shell">
-      <motion.section
-        className="hero-card"
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Row gutter={[24, 24]} align="middle">
-          <Col xs={24} lg={14}>
-            <span className="soft-chip">SMART RESIDENTIAL MANAGEMENT</span>
-            <h1 className="hero-title">
-              Manage Properties. Connect Residents. Simplify Everything.
-            </h1>
-            <p className="hero-description">
-              RMS brings property management, resident communication, payments,
-              maintenance, and analytics together in one premium platform.
-            </p>
-            <div className="hero-actions">
-              <Link to="/register" className="btn-primary">
-                <SearchOutlined /> Get Started
-              </Link>
-              <Link to="/services" className="btn-secondary">
-                Explore Services
-              </Link>
-            </div>
-            <div className="hero-quick-stats">
-              <div>
-                <strong>240+</strong>
-                <span>Properties managed</span>
-              </div>
-              <div>
-                <strong>18k</strong>
-                <span>Residents served</span>
-              </div>
-              <div>
-                <strong>24/7</strong>
-                <span>Support available</span>
-              </div>
-            </div>
-          </Col>
-          <Col xs={24} lg={10}>
-            <div className="hero-illustration">
-              <div className="building-scene">
-                <div className="scene-glow" />
-                <div className="building-tower large" />
-                <div className="building-tower small" />
-                <div className="tree tree-left" />
-                <div className="tree tree-right" />
-                <div className="road" />
-                <div className="floating-card top-card">+12% occupancy</div>
-                <div className="floating-card mid-card">PKR 4.2M revenue</div>
-                <div className="floating-card bottom-card">
-                  Maintenance on track
-                </div>
-              </div>
-            </div>
-          </Col>
-        </Row>
-      </motion.section>
-
-      <section className="section-card section-spacing">
-        <div className="section-header">
-          <div>
-            <h3 className="section-title">Featured Properties</h3>
-            <p className="section-subtitle">
-              Curated homes and apartments across premium communities.
-            </p>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}>
+        {loading ? <div style={{ textAlign: 'center', padding: 30 }}><Spin size="large"/></div> : null}
+        {error ? <div style={{ margin: '12px 0' }}><Alert type="error" message={error} /></div> : null}
+        <HeroSection />
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <div style={{ width: '100%', maxWidth: 1100 }}>
+            <PropertySearch />
           </div>
-          <Link to="/properties" className="btn-ghost">
-            View all
-          </Link>
         </div>
-        <Row gutter={[16, 16]} style={{ marginTop: 8 }}>
-          {properties.slice(0, 3).map((property) => (
-            <Col xs={24} md={8} key={property.id}>
-              <Card
-                className="property-card card-hover"
-                cover={<img alt={property.title} src={property.image} />}
-              >
-                <div className="card-body">
-                  <div className="card-top-row">
-                    <Tag color="blue">{property.type}</Tag>
-                    <span className="card-price">{property.price}</span>
+      </motion.div>
+
+      <FeaturedProperties items={properties.slice(0,4)} />
+
+      {/* Properties For Sale section */}
+      {properties.filter(p => p.transactionType === 'Sale').length > 0 && (
+        <section className="hr-section">
+          <div className="section-header">
+            <div>
+              <h3 className="section-title">Properties For Sale</h3>
+              <p className="section-sub">House and Apartment listings for sale.</p>
+            </div>
+            <Link to="/properties?transaction=Sale" className="btn-ghost">View all sales</Link>
+          </div>
+          <Row gutter={[16,16]} style={{ marginTop: 8 }}>
+            {properties.filter(p => p.transactionType === 'Sale').slice(0,6).map((property) => (
+              <Col xs={24} sm={12} md={8} key={property.id}>
+                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
+                  <div className="card-body">
+                    <div className="card-top-row">
+                      <Tag color="gold">FOR SALE</Tag>
+                      <span className="card-price">{property.price}</span>
+                    </div>
+                    <div className="card-title">{property.title}</div>
+                    <div className="card-address">{property.address}</div>
+                    <div className="meta-row">
+                      <span className="meta-pill">{property.bedrooms} beds</span>
+                      <span className="meta-pill">{property.bathrooms} baths</span>
+                      <span className="meta-pill">{property.area}</span>
+                    </div>
+                    <div className="card-actions">
+                      <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
+                      <FavoriteToggle item={property} label="Save" />
+                    </div>
                   </div>
-                  <div className="card-title">{property.title}</div>
-                  <div className="card-address">{property.address}</div>
-                  <div className="meta-row">
-                    <span className="meta-pill">{property.bedrooms} beds</span>
-                    <span className="meta-pill">
-                      {property.bathrooms} baths
-                    </span>
-                    <span className="meta-pill">
-                      Parking {property.parking}
-                    </span>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </section>
+      )}
+
+      {properties.filter(p => p.transactionType === 'Rent').length > 0 && (
+        <section className="hr-section">
+          <div className="section-header">
+            <div>
+              <h3 className="section-title">Properties for Rent</h3>
+              <p className="section-sub">Flats and Rooms available for immediate move-in.</p>
+            </div>
+            <Link to="/properties?transaction=Rent" className="btn-ghost">View all rents</Link>
+          </div>
+
+          <Row gutter={[16,16]} style={{ marginTop: 8 }}>
+            {properties.filter(p => p.transactionType === 'Rent').slice(0,8).map((property) => (
+              <Col xs={24} md={12} lg={6} key={property.id}>
+                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
+                  <div className="card-body">
+                    <div className="card-top-row">
+                      <Tag color="cyan">FOR RENT</Tag>
+                      <span className="card-price">{property.rentPrice || property.price}</span>
+                    </div>
+                    <div className="card-title">{property.title}</div>
+                    <div className="card-address">{property.address}</div>
+                    <div className="meta-row">
+                      <span className="meta-pill">{property.bedrooms} beds</span>
+                      <span className="meta-pill">{property.bathrooms} baths</span>
+                      <span className="meta-pill">{property.area}</span>
+                    </div>
+                    <div className="card-actions">
+                      <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
+                      <FavoriteToggle item={property} label="Save" />
+                      <Button type="primary" onClick={() => { setRentalSelected(property); setRentalBookingOpen(true); }}>Rent Now</Button>
+                    </div>
                   </div>
-                  <div className="card-actions">
-                    <Button type="primary" onClick={() => navigate("/demo")}>
-                      View
-                    </Button>
-                    <FavoriteToggle item={property} label="Save" />
-                    <Button onClick={() => navigate("/contact")}>
-                      Contact
-                    </Button>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </section>
+      )}
+
+      <WhyChooseRMS />
+      <HowItWorks />
+      <HomeCTA />
+      <HomeFooter />
+
+      {properties.filter(p => p.transactionType === 'Rent').length > 0 && (
+        <section className="section-card section-spacing">
+          <div className="section-header">
+            <div>
+              <h3 className="section-title">Properties for Rent</h3>
+              <p className="section-subtitle">Flats and Rooms available for immediate move-in.</p>
+            </div>
+            <Link to="/properties?transaction=Rent" className="btn-ghost">View all rents</Link>
+          </div>
+
+          <Row gutter={[16,16]} style={{ marginTop: 8 }}>
+            {properties.filter(p => p.transactionType === 'Rent').slice(0,4).map((property) => (
+              <Col xs={24} md={12} lg={6} key={property.id}>
+                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
+                  <div className="card-body">
+                    <div className="card-top-row">
+                      <Tag color="cyan">FOR RENT</Tag>
+                      <span className="card-price">{property.rentPrice || property.price}</span>
+                    </div>
+                    <div className="card-title">{property.title}</div>
+                    <div className="card-address">{property.address}</div>
+                    <div className="meta-row">
+                      <span className="meta-pill">{property.bedrooms} beds</span>
+                      <span className="meta-pill">{property.bathrooms} baths</span>
+                      <span className="meta-pill">{property.area}</span>
+                    </div>
+                    <div className="card-actions">
+                      <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
+                      <FavoriteToggle item={property} label="Save" />
+                      <Button type="primary" onClick={() => { setRentalSelected(property); setRentalBookingOpen(true); }}>Rent Now</Button>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </section>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </section>
+      )}
+
+      <RentalBookingModal open={rentalBookingOpen} onClose={() => setRentalBookingOpen(false)} property={rentalSelected} />
 
       <section className="section-card section-spacing">
         <div className="section-header">
@@ -384,81 +364,7 @@ function HomePage() {
         </Row>
       </section>
 
-      <section className="section-card section-spacing dashboard-home-section">
-        <div className="dashboard-home-header">
-          <div>
-            <h3 className="section-title">User Dashboard</h3>
-            <p className="section-subtitle">
-              Your current account details and all saved submissions from the website.
-            </p>
-          </div>
-          {userDashboardEntries.length > 0 && (
-            <Button danger onClick={handleClearAll}>Clear All</Button>
-          )}
-        </div>
-
-        <div className="dashboard-user-summary">
-          <div className="dashboard-user-meta">
-            <Avatar size={56} style={{ background: "linear-gradient(135deg, #0b2450, #28b463)" }}>
-              {(currentUser.name || "RMS").charAt(0).toUpperCase()}
-            </Avatar>
-            <div>
-              <h4>{currentUser.name || "RMS User"}</h4>
-              <p>{currentUser.email || "No email linked yet"}</p>
-              <Tag color="green">{currentUser.role || "resident"}</Tag>
-            </div>
-          </div>
-          <div className="dashboard-metric-wrap">
-            <div className="dashboard-metric">
-              <span>Total</span>
-              <strong>{userDashboardEntries.length}</strong>
-            </div>
-            <div className="dashboard-metric">
-              <span>Contact</span>
-              <strong>{userDashboardEntries.filter((item) => item.source === "contact" || item.formType?.includes("Contact")).length}</strong>
-            </div>
-            <div className="dashboard-metric">
-              <span>Property</span>
-              <strong>{userDashboardEntries.filter((item) => item.propertyType || item.category).length}</strong>
-            </div>
-          </div>
-        </div>
-
-        {userDashboardEntries.length === 0 ? (
-          <div className="dashboard-empty-state">No data available yet.</div>
-        ) : (
-          <List
-            itemLayout="vertical"
-            dataSource={userDashboardEntries}
-            renderItem={(entry) => (
-              <List.Item
-                actions={[
-                  <Button key="view" type="link" onClick={() => openViewModal(entry)}>View</Button>,
-                  <Button key="edit" type="link" onClick={() => openEditModal(entry)}>Edit</Button>,
-                  <Button key="delete" type="link" danger onClick={() => handleDelete(entry.id)}>Delete</Button>,
-                ]}
-              >
-                <div className="dashboard-entry-card">
-                  <div className="dashboard-entry-top">
-                    <div>
-                      <strong>{entry.title || entry.formType || "Submission"}</strong>
-                      <div className="dashboard-entry-type">{entry.formType || entry.source || "General Form"}</div>
-                    </div>
-                    <Tag color={entry.status === "New" ? "blue" : "green"}>{entry.status || "New"}</Tag>
-                  </div>
-                  <div className="dashboard-entry-details">
-                    <span>{entry.userName || currentUser.name || "RMS User"}</span>
-                    <span>{entry.email || currentUser.email || "No email"}</span>
-                    <span>{entry.location || entry.propertyType || "General"}</span>
-                    <span>{entry.price || "No price"}</span>
-                  </div>
-                  {entry.description && <p className="dashboard-entry-description">{entry.description}</p>}
-                </div>
-              </List.Item>
-            )}
-          />
-        )}
-      </section>
+      {/* Dashboard UI removed from Home page to keep Home clean. Dashboard is available at /dashboard */}
 
       <ChatBot />
       <ActionModal
@@ -469,51 +375,7 @@ function HomePage() {
         onSubmit={() => toast.success("Your viewing request has been sent.")}
       />
 
-      <Modal
-        open={Boolean(dashboardModal)}
-        onCancel={() => setDashboardModal(null)}
-        footer={
-          dashboardModal?.type === "edit"
-            ? [
-                <Button key="cancel" onClick={() => setDashboardModal(null)}>Cancel</Button>,
-                <Button key="save" type="primary" onClick={handleSaveEdit}>Save</Button>,
-              ]
-            : [<Button key="close" type="primary" onClick={() => setDashboardModal(null)}>Close</Button>]
-        }
-        title={dashboardModal?.type === "edit" ? "Edit submission" : "Submission details"}
-      >
-        {dashboardModal?.type === "view" && dashboardModal.entry ? (
-          <div className="dashboard-modal-body">
-            <p><strong>Title:</strong> {dashboardModal.entry.title || dashboardModal.entry.formType}</p>
-            <p><strong>Type:</strong> {dashboardModal.entry.formType || dashboardModal.entry.source}</p>
-            <p><strong>User:</strong> {dashboardModal.entry.userName || currentUser.name}</p>
-            <p><strong>Email:</strong> {dashboardModal.entry.email || currentUser.email || "No email"}</p>
-            <p><strong>Location:</strong> {dashboardModal.entry.location || "Not provided"}</p>
-            <p><strong>Price:</strong> {dashboardModal.entry.price || "Not provided"}</p>
-            <p><strong>Status:</strong> {dashboardModal.entry.status || "New"}</p>
-            <p><strong>Submitted:</strong> {new Date(dashboardModal.entry.submittedAt || Date.now()).toLocaleString("en-PK")}</p>
-            <p><strong>Details:</strong> {dashboardModal.entry.description || "No additional details provided."}</p>
-          </div>
-        ) : (
-          <Form form={editForm} layout="vertical">
-            <Form.Item name="title" label="Title" rules={[{ required: true, message: "Please enter a title" }]}>
-              <Input />
-            </Form.Item>
-            <Form.Item name="location" label="Location">
-              <Input />
-            </Form.Item>
-            <Form.Item name="price" label="Price">
-              <Input />
-            </Form.Item>
-            <Form.Item name="status" label="Status">
-              <Input />
-            </Form.Item>
-            <Form.Item name="description" label="Description">
-              <Input.TextArea rows={4} />
-            </Form.Item>
-          </Form>
-        )}
-      </Modal>
+      {/* Dashboard modal removed from Home page */}
     </div>
   );
 }

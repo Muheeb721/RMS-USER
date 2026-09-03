@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react';
-import { Row, Col, Card, Tag, Button, Select, Statistic, Divider, Typography } from 'antd';
+import { useMemo, useState, useEffect } from 'react';
+import { Row, Col, Card, Tag, Button, Select, Statistic, Divider, Typography, InputNumber, Spin, Alert } from 'antd';
 import { ShareAltOutlined, EyeOutlined, EnvironmentOutlined } from '@ant-design/icons';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { hostelData } from '../data/dummyData';
 import { useProperties } from '../contexts/PropertyContext';
+import { getRecommendations } from '../services/recommendationService.jsx';
 import MapView from '../components/MapView';
 import ActionModal from '../components/ActionModal';
 import InquiryModal from '../components/InquiryModal';
 import VisitModal from '../components/VisitModal';
 import FavoriteToggle from '../components/FavoriteToggle';
+import RentalBookingModal from '../components/RentalBookingModal';
 import './PropertyListingsPage.css';
 import { toast } from 'react-toastify';
 
@@ -19,6 +22,27 @@ function PropertyListingsPage() {
   const [modalType, setModalType] = useState('details');
   const [searchParams, setSearchParams] = useSearchParams();
   const { properties, updateProperty } = useProperties();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const propertyService = await import('../services/propertyService');
+        await propertyService.listProperties();
+      } catch (e) {
+        console.warn('PropertyListings initial load failed', e);
+        if (mounted) setError('Unable to load properties');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+  const { user } = useSelector((state) => state.auth || {});
 
   const selectedArea = searchParams.get('area') || 'All Areas';
   const areaOptions = useMemo(() => {
@@ -26,13 +50,7 @@ function PropertyListingsPage() {
     return ['All Areas', ...areas];
   }, []);
 
-  const filteredProperties = useMemo(() => {
-    if (!selectedArea || selectedArea === 'All Areas') {
-      return properties;
-    }
-
-    return properties.filter((property) => property.area === selectedArea);
-  }, [properties, selectedArea]);
+  // filteredProperties derives from properties, selected area and additional filters below
 
   const handleAction = (type, item) => {
     setSelectedProperty(item);
@@ -57,17 +75,85 @@ function PropertyListingsPage() {
 
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
+      const [filters, setFilters] = useState({
+        transaction: searchParams.get('transaction') || 'All',
+        type: searchParams.get('type') || 'All',
+        minPrice: '',
+        maxPrice: searchParams.get('budget') || '',
+        bedrooms: 'Any',
+        bathrooms: 'Any',
+        availability: 'All',
+      });
+  const [bookingOpen, setBookingOpen] = useState(false);
 
   const handleOpenInquiry = (item) => {
     setSelectedProperty(item);
     setInquiryOpen(true);
   };
 
-  const handleOpenVisit = (item) => {
-    setSelectedProperty(item);
-    setVisitOpen(true);
+  const handleProtectedNavigation = (targetUrl) => {
+    if (!user?.isLoggedIn) {
+      navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
+      return;
+    }
+
+    navigate(targetUrl);
   };
 
+  const filteredProperties = useMemo(() => {
+    let list = properties.slice();
+
+    if (selectedArea && selectedArea !== 'All Areas') {
+      list = list.filter((p) => p.area === selectedArea);
+    }
+
+    if (filters.transaction && filters.transaction !== 'All') {
+      list = list.filter((p) => p.transactionType === filters.transaction);
+    }
+
+    if (filters.type && filters.type !== 'All') {
+      list = list.filter((p) => p.type === filters.type);
+    }
+
+    const min = Number(filters.minPrice || 0);
+    const max = Number(filters.maxPrice || 0);
+    if (filters.minPrice) list = list.filter((p) => { const v = Number(String(p.price || p.rentPrice || p.salePrice || 0).replace(/[^0-9.-]+/g, '')); return v >= min; });
+    if (filters.maxPrice) list = list.filter((p) => { const v = Number(String(p.price || p.rentPrice || p.salePrice || 0).replace(/[^0-9.-]+/g, '')); return max ? v <= max : true; });
+
+    if (filters.bedrooms && filters.bedrooms !== 'Any') {
+      const num = Number(filters.bedrooms);
+      list = list.filter((p) => Number(p.bedrooms || 0) >= num);
+    }
+
+    if (filters.bathrooms && filters.bathrooms !== 'Any') {
+      const num = Number(filters.bathrooms);
+      list = list.filter((p) => Number(p.bathrooms || 0) >= num);
+    }
+
+    if (filters.availability && filters.availability !== 'All') {
+      list = list.filter((p) => p.availability === filters.availability || p.status === filters.availability);
+    }
+
+    return list;
+  }, [properties, selectedArea, filters]);
+
+  // Build AI recommendations based on current search preferences
+  const recommendationPreferences = useMemo(() => ({
+    budget: Number(filters.maxPrice || 0) || 0,
+    type: filters.type && filters.type !== 'All' ? filters.type : 'Any',
+    location: selectedArea && selectedArea !== 'All Areas' ? selectedArea : '',
+    bedrooms: filters.bedrooms && filters.bedrooms !== 'Any' ? Number(filters.bedrooms) : 0,
+    bathrooms: filters.bathrooms && filters.bathrooms !== 'Any' ? Number(filters.bathrooms) : 0,
+    saleType: filters.transaction && filters.transaction !== 'All' ? filters.transaction : '',
+  }), [filters, selectedArea]);
+
+  const recommendations = useMemo(() => {
+    try {
+      return getRecommendations(properties, recommendationPreferences).slice(0, 12);
+    } catch (e) {
+      return [];
+    }
+  }, [properties, recommendationPreferences]);
   const handleModalSubmit = (payload) => {
     if (!payload) return;
     const { item, ...updates } = payload;
@@ -93,30 +179,58 @@ function PropertyListingsPage() {
         <h2 className="section-title">Property Listings</h2>
         <Paragraph className="section-subtitle">Search premium homes, apartments, flats, and commercial spaces across Lahore with real-time insights.</Paragraph>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
-          <Select defaultValue="All Types" style={{ minWidth: 180 }}>
-            <Select.Option value="All Types">All Types</Select.Option>
+          <Select value={filters.transaction} style={{ minWidth: 160 }} onChange={(v) => setFilters((s)=>({...s, transaction: v}))}>
+            <Select.Option value="All">All Transactions</Select.Option>
+            <Select.Option value="Sale">Sale</Select.Option>
+            <Select.Option value="Rent">Rent</Select.Option>
+          </Select>
+
+          <Select value={filters.type} style={{ minWidth: 160 }} onChange={(v) => setFilters((s)=>({...s, type: v}))}>
+            <Select.Option value="All">All Types</Select.Option>
             <Select.Option value="House">House</Select.Option>
             <Select.Option value="Apartment">Apartment</Select.Option>
             <Select.Option value="Flat">Flat</Select.Option>
+            <Select.Option value="Room">Room</Select.Option>
           </Select>
-          <Select
-            value={selectedArea}
-            style={{ minWidth: 180 }}
-            onChange={(value) => {
-              if (value === 'All Areas') {
-                setSearchParams({});
-              } else {
-                setSearchParams({ area: value });
-              }
-            }}
-          >
-            {areaOptions.map((area) => (
-              <Select.Option key={area} value={area}>{area}</Select.Option>
-            ))}
+
+          <Select value={filters.bedrooms} style={{ minWidth: 120 }} onChange={(v) => setFilters((s)=>({...s, bedrooms: v}))}>
+            <Select.Option value="Any">Beds</Select.Option>
+            <Select.Option value="1">1+</Select.Option>
+            <Select.Option value="2">2+</Select.Option>
+            <Select.Option value="3">3+</Select.Option>
+            <Select.Option value="4">4+</Select.Option>
           </Select>
+
+          <Select value={filters.bathrooms} style={{ minWidth: 120 }} onChange={(v) => setFilters((s)=>({...s, bathrooms: v}))}>
+            <Select.Option value="Any">Baths</Select.Option>
+            <Select.Option value="1">1+</Select.Option>
+            <Select.Option value="2">2+</Select.Option>
+            <Select.Option value="3">3+</Select.Option>
+          </Select>
+
+          <Select value={filters.availability} style={{ minWidth: 140 }} onChange={(v) => setFilters((s)=>({...s, availability: v}))}>
+            <Select.Option value="All">All Availability</Select.Option>
+            <Select.Option value="Available">Available</Select.Option>
+            <Select.Option value="Reserved">Reserved</Select.Option>
+            <Select.Option value="Rented">Rented</Select.Option>
+            <Select.Option value="Sold">Sold</Select.Option>
+          </Select>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <InputNumber placeholder="Min" value={filters.minPrice} onChange={(v)=>setFilters((s)=>({...s, minPrice: v}))} style={{ width: 100 }} />
+            <InputNumber placeholder="Max" value={filters.maxPrice} onChange={(v)=>setFilters((s)=>({...s, maxPrice: v}))} style={{ width: 100 }} />
+            <Button onClick={()=>setFilters({ transaction: 'All', type: 'All', minPrice: '', maxPrice: '', bedrooms: 'Any', bathrooms: 'Any', availability: 'All' })}>Reset</Button>
+          </div>
+
         </div>
+
         <div style={{ marginBottom: 16 }}>
-          <MapView selectedArea={selectedArea} />
+          {error ? <Alert type="error" message={error} style={{ marginBottom: 12 }} /> : null}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+          ) : (
+            <MapView selectedArea={selectedArea} />
+          )}
         </div>
         <div style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
           <Button onClick={goToCompare} disabled={compareSelection.length < 2}>Compare Selected ({compareSelection.length})</Button>
@@ -137,8 +251,11 @@ function PropertyListingsPage() {
                   <div className="property-cover">
                     <img alt={property.title} src={property.image} />
                     <div className="cover-actions">
-                      <Button type="primary" icon={<EyeOutlined />} onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); navigate(`/properties/${property.id}`); }}>View</Button>
-                      <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); navigate(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`); }}>Contact</Button>
+                      <Button type="primary" icon={<EyeOutlined />} onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/properties/${property.id}`); }}>View</Button>
+                      <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`); }}>Contact</Button>
+                      {property.transactionType === 'Rent' && (
+                        <Button type="primary" style={{ background: '#28b463', borderColor: '#28b463' }} onClick={() => { setSelectedProperty(property); setBookingOpen(true); }}>Rent Now</Button>
+                      )}
                     </div>
                   </div>
                 }
@@ -171,10 +288,36 @@ function PropertyListingsPage() {
             </Col>
           ))}
         </Row>
+        {filteredProperties.length === 0 && recommendations && recommendations.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <Card title="No exact matches — similar recommendations" style={{ marginBottom: 12 }}>
+              <Row gutter={[12, 12]}>
+                {recommendations.map((property) => (
+                  <Col xs={24} md={12} lg={8} key={property.id}>
+                    <Card size="small" hoverable onClick={() => navigate(`/properties/${property.id}`)}>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <img src={property.image} alt={property.title} style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700 }}>{property.title}</div>
+                          <div style={{ color: '#64748b' }}>{property.area || property.location}</div>
+                          <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 700 }}>{property.price}</span>
+                            <Tag color="green">{property.matchScore}%</Tag>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            </Card>
+          </div>
+        )}
       </section>
       <ActionModal open={Boolean(selectedProperty) && modalType !== 'contact'} onClose={() => setSelectedProperty(null)} type={modalType} item={selectedProperty} onSubmit={handleModalSubmit} />
       <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={selectedProperty} onSubmitted={() => toast.success('Inquiry submitted.')} />
       <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={selectedProperty} onSubmitted={() => toast.success('Visit request submitted.')} />
+      <RentalBookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} property={selectedProperty} />
     </div>
   );
 }

@@ -65,34 +65,59 @@ function Signup() {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
 
     try {
-      const now = new Date();
-      const user = saveSessionUser({
+      const payload = {
         name: form.name.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
+        password: form.password,
         role: form.accountType === "owner" ? "owner" : "resident",
-        isLoggedIn: true,
-        loginDate: now.toLocaleDateString("en-PK"),
-        loginTime: now.toLocaleTimeString("en-PK", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
+      };
+
+      const result = await fetch((import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api') + '/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
+
+      const json = await result.json();
+      if (!result.ok || !json?.success) {
+        throw new Error(json?.message || 'Signup failed');
+      }
+
+      const token = json?.data?.token;
+      const userPayload = json?.data?.user || {};
+      const user = saveSessionUser({
+        name: userPayload.name || form.name.trim(),
+        email: userPayload.email || form.email.trim(),
+        role: userPayload.role || (form.accountType === 'owner' ? 'owner' : 'resident'),
+        isLoggedIn: true,
+        loginDate: new Date().toLocaleDateString('en-PK'),
+        loginTime: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
+      });
+
+      if (typeof window !== 'undefined' && token) {
+        window.__RMS_AUTH_TOKEN = token;
+        window.__rms_inmemory_token = token;
+      }
 
       dispatch(login(user));
       dispatch(addNotification(createLoginNotification(user)));
       dispatch(addNotification(createSignupNotification(user)));
       toast.success(`Welcome to RMS, ${user.name}!`);
-      setSubmitting(false);
-      navigate("/");
+      const nextRoute = form.accountType === 'owner' || user.role === 'admin' || user.role === 'owner' || user.role === 'manager'
+        ? '/admin'
+        : '/dashboard';
+      navigate(nextRoute, { replace: true });
     } catch (err) {
       console.error(err);
-      toast.error("Unable to create account. Please try again.");
+      toast.error(err.message || 'Unable to create account. Please try again.');
+    } finally {
       setSubmitting(false);
     }
   };

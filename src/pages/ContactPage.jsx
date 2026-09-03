@@ -1,94 +1,90 @@
-import { useState, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { Link, useLocation } from 'react-router-dom';
-import './ContactPage.css';
-import { addNotification } from '../redux/store';
-import { createContactNotification } from '../services/notificationService.jsx';
-import { recordDashboardSubmission } from '../utils/dashboardSubmissionStorage.jsx';
-import { add as addContactRequest } from '../utils/contactRequestsStorage.jsx';
-import { sanitizeFullName } from '../utils/nameValidation.jsx';
-import { readSelectedProperty, clearSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
+import { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { Link, useLocation } from "react-router-dom";
+import "./ContactPage.css";
+import { addNotification } from "../redux/store";
+import { createContactNotification } from "../services/notificationService.jsx";
+import { recordDashboardSubmission } from "../utils/dashboardSubmissionStorage.jsx";
+import { add as addContactRequest } from "../utils/contactRequestsStorage.jsx";
+import { sanitizeFullName } from "../utils/nameValidation.jsx";
+import {
+  readSelectedProperty,
+  clearSelectedProperty,
+} from "../utils/selectedPropertyStorage.jsx";
 
 const initialFormState = {
-  fullName: '',
-  email: '',
-  phone: '',
-  propertyType: '',
-  inquiryType: '',
-  property: '',
-  budget: '',
-  preferredDate: '',
-  residents: '',
-  message: '',
+  fullName: "",
+  email: "",
+  phone: "",
+  message: "",
 };
 
 const propertyOptions = {
   House: [
-    'Modern Family House',
-    'Luxury Villa',
-    'Green View House',
-    'City Residence',
-    'Premium Family Home',
+    "Modern Family House",
+    "Luxury Villa",
+    "Green View House",
+    "City Residence",
+    "Premium Family Home",
   ],
   Apartment: [
-    'Downtown Apartment',
-    'Luxury Apartment',
-    'City View Apartment',
-    'Modern Studio',
-    'Skyline Residence',
+    "Downtown Apartment",
+    "Luxury Apartment",
+    "City View Apartment",
+    "Modern Studio",
+    "Skyline Residence",
   ],
   Hostel: [
-    'City Student Hostel',
-    'Prime Boys Hostel',
-    'Green View Hostel',
-    'University Hostel',
-    'Scholars Hostel',
+    "City Student Hostel",
+    "Prime Boys Hostel",
+    "Green View Hostel",
+    "University Hostel",
+    "Scholars Hostel",
   ],
 };
 
 const contactDetails = {
-  phone: '+92 304 0044410',
-  phoneHref: 'tel:+923040044410',
-  email: 'muheebshahid75@gmail.com',
-  emailHref: 'mailto:muheebshahid75@gmail.com',
-  locationLabel: 'DHA Lahore, Pakistan',
-  mapsHref: 'https://www.google.com/maps/search/?api=1&query=DHA+Lahore+Pakistan',
+  phone: "+92 304 0044410",
+  phoneHref: "tel:+923040044410",
+  email: "muheebshahid75@gmail.com",
+  emailHref: "mailto:muheebshahid75@gmail.com",
+  locationLabel: "DHA Lahore, Pakistan",
+  mapsHref:
+    "https://www.google.com/maps/search/?api=1&query=DHA+Lahore+Pakistan",
 };
 
 const infoCards = [
   {
-    icon: '📞',
-    title: 'Call Us',
+    icon: "📞",
+    title: "Call Us",
     text: contactDetails.phone,
     href: contactDetails.phoneHref,
-    actionLabel: 'Call now',
+    actionLabel: "Call now",
     isActionable: true,
   },
   {
-    icon: '✉️',
-    title: 'Email Us',
+    icon: "✉️",
+    title: "Email Us",
     text: contactDetails.email,
     href: contactDetails.emailHref,
-    actionLabel: 'Email now',
+    actionLabel: "Email now",
     isActionable: true,
   },
   {
-    icon: '📍',
-    title: 'Visit Our Office',
+    icon: "📍",
+    title: "Visit Our Office",
     text: contactDetails.locationLabel,
     href: contactDetails.mapsHref,
-    actionLabel: 'Open map',
+    actionLabel: "Open map",
     isActionable: true,
   },
   {
-    icon: '🕒',
-    title: 'Working Hours',
-    text: 'Monday - Saturday\n9:00 AM - 6:00 PM',
+    icon: "🕒",
+    title: "Working Hours",
+    text: "Monday - Saturday\n9:00 AM - 6:00 PM",
     isActionable: false,
   },
 ];
-
-
 
 function ContactPage() {
   const dispatch = useDispatch();
@@ -97,28 +93,40 @@ function ContactPage() {
   const [selectedProperty, setSelectedProperty] = useState(null);
 
   useEffect(() => {
-    // prefer selected property from localStorage
-    const sel = readSelectedProperty();
-    if (sel) {
-      setSelectedProperty(sel);
-      setFormData((prev) => ({
-        ...prev,
-        property: sel.title || sel.name || prev.property,
-        propertyType: sel.type || prev.propertyType,
-        budget: sel.price || prev.budget,
-      }));
-      return;
-    }
+    // prefer selected property from backend/profile (no localStorage)
+    (async () => {
+      try {
+        const sel = await readSelectedProperty();
+        if (sel) {
+          setSelectedProperty(sel);
+          setFormData((prev) => ({
+            ...prev,
+            property: sel.title || sel.name || prev.property,
+            propertyType: sel.type || prev.propertyType,
+            budget: sel.price || prev.budget,
+          }));
+          return;
+        }
+      } catch (e) {
+        // continue to check URL params
+      }
+    })();
 
     if (!location || !location.search) return;
     const params = new URLSearchParams(location.search);
-    const propertyTitle = params.get('propertyTitle');
-    const propertyType = params.get('propertyType');
+    const propertyTitle = params.get("propertyTitle");
+    const propertyType = params.get("propertyType");
     if (propertyTitle) {
-      setFormData((prev) => ({ ...prev, property: decodeURIComponent(propertyTitle) }));
+      setFormData((prev) => ({
+        ...prev,
+        property: decodeURIComponent(propertyTitle),
+      }));
     }
     if (propertyType) {
-      setFormData((prev) => ({ ...prev, propertyType: decodeURIComponent(propertyType) }));
+      setFormData((prev) => ({
+        ...prev,
+        propertyType: decodeURIComponent(propertyType),
+      }));
     }
   }, [location]);
   const [errors, setErrors] = useState({});
@@ -128,15 +136,12 @@ function ContactPage() {
   const handleChange = (event) => {
     const { name, value } = event.target;
 
-    if (name === 'propertyType') {
-      setFormData((prev) => ({ ...prev, propertyType: value, property: '' }));
-    } else {
-      const sanitizedValue = name === 'fullName' ? sanitizeFullName(value) : value;
-      setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
-    }
+    const sanitizedValue =
+      name === "fullName" ? sanitizeFullName(value) : value;
+    setFormData((prev) => ({ ...prev, [name]: sanitizedValue }));
 
     if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
@@ -144,24 +149,22 @@ function ContactPage() {
     const nextErrors = {};
 
     if (!formData.fullName.trim()) {
-      nextErrors.fullName = 'Please enter your full name.';
+      nextErrors.fullName = "Please enter your name.";
     } else if (!/^[A-Za-z ]+$/.test(formData.fullName.trim())) {
-      nextErrors.fullName = 'Full name can contain only letters and spaces.';
+      nextErrors.fullName = "Name can contain only letters and spaces.";
     }
     if (!formData.email.trim()) {
-      nextErrors.email = 'Please enter your email address.';
+      nextErrors.email = "Please enter your email address.";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]*$/.test(formData.email)) {
-      nextErrors.email = 'Please enter a valid email address.';
+      nextErrors.email = "Please enter a valid email address.";
     }
     if (!formData.phone.trim()) {
-      nextErrors.phone = 'Please enter your phone number.';
+      nextErrors.phone = "Please enter your contact number.";
     } else if (!/^\+?[0-9\s()-]{7,15}$/.test(formData.phone)) {
-      nextErrors.phone = 'Please enter a valid phone number.';
+      nextErrors.phone = "Please enter a valid contact number.";
     }
-    if (!formData.propertyType) nextErrors.propertyType = 'Please select a property type.';
-    if (!formData.inquiryType) nextErrors.inquiryType = 'Please select an inquiry type.';
-    if (!formData.property) nextErrors.property = 'Please select a property.';
-    if (!formData.message.trim()) nextErrors.message = 'Please enter your message.';
+    if (!formData.message.trim())
+      nextErrors.message = "Please enter your message.";
 
     return nextErrors;
   };
@@ -177,41 +180,46 @@ function ContactPage() {
     }
 
     const inquiryNotification = {
-      title: formData.inquiryType === 'General Inquiry' ? 'New Inquiry Received' : 'Property Inquiry Submitted',
-      message: `Your ${formData.inquiryType || 'property'} request for ${formData.property || 'the selected property'} has been received. Our team will contact you shortly.`,
-      category: 'Property',
-      accent: 'info',
-      icon: '🏠',
-      action: 'View Inquiry',
+      title: "New Inquiry Received",
+      message: `Your property inquiry for ${selectedProperty?.title || "the selected property"} has been received. Our team will contact you shortly.`,
+      category: "Property",
+      accent: "info",
+      icon: "🏠",
+      action: "View Inquiry",
     };
 
-    dispatch(addNotification(createContactNotification({
-      fullName: formData.fullName.trim(),
-      inquiryType: formData.inquiryType,
-      property: formData.property,
-      message: formData.message.trim(),
-      email: formData.email.trim(),
-    })));
+    dispatch(
+      addNotification(
+        createContactNotification({
+          fullName: formData.fullName.trim(),
+          inquiryType: "General Inquiry",
+          property: selectedProperty?.title || "Selected Property",
+          message: formData.message.trim(),
+          email: formData.email.trim(),
+        }),
+      ),
+    );
 
     const contactRecord = {
       id: `contact-${Date.now()}`,
-      source: 'contact',
-      formType: 'Contact Inquiry',
-      title: `${formData.inquiryType} request`,
-      category: formData.propertyType,
-      status: 'New',
+      source: "contact",
+      formType: "Contact Inquiry",
+      title: "Property inquiry request",
+      category: selectedProperty?.type || "General",
+      status: "New",
       userName: formData.fullName.trim(),
       email: formData.email.trim(),
       phone: formData.phone.trim(),
-      propertyId: selectedProperty?.id || '',
-      propertyName: formData.property || selectedProperty?.title || '',
-      propertyImage: selectedProperty?.image || selectedProperty?.images?.[0] || '',
-      propertyType: formData.propertyType,
-      location: selectedProperty?.address || formData.property || 'General inquiry',
-      price: selectedProperty?.price || formData.budget || '',
-      bedrooms: selectedProperty?.bedrooms || '',
-      bathrooms: selectedProperty?.bathrooms || '',
-      area: selectedProperty?.area || '',
+      propertyId: selectedProperty?.id || "",
+      propertyName: selectedProperty?.title || "Selected Property",
+      propertyImage:
+        selectedProperty?.image || selectedProperty?.images?.[0] || "",
+      propertyType: selectedProperty?.type || "General",
+      location: selectedProperty?.address || "General inquiry",
+      price: selectedProperty?.price || "",
+      bedrooms: selectedProperty?.bedrooms || "",
+      bathrooms: selectedProperty?.bathrooms || "",
+      area: selectedProperty?.area || "",
       description: formData.message.trim(),
       submittedAt: new Date().toISOString(),
     };
@@ -222,34 +230,53 @@ function ContactPage() {
       addContactRequest({
         ...contactRecord,
         message: formData.message.trim(),
-        inquiryType: formData.inquiryType,
+        inquiryType: "General Inquiry",
         createdAt: new Date().toISOString(),
       });
     } catch (e) {
-      console.error('save contact request', e);
+      console.error("save contact request", e);
     }
 
     setShowSuccess(true);
     setFormData(initialFormState);
     setErrors({});
     // clear selected property after successful submission
-    try { clearSelectedProperty(); setSelectedProperty(null); } catch (e) {}
+    try {
+      clearSelectedProperty();
+      setSelectedProperty(null);
+    } catch (e) {}
   };
 
   const propertyList = propertyOptions[formData.propertyType] || [];
-  const showBudgetField = ['Buy House', 'Rent House', 'Rent Apartment'].includes(formData.inquiryType);
-  const showDateField = ['Book Apartment', 'Book Hostel Room'].includes(formData.inquiryType);
-  const dateFieldLabel = formData.inquiryType === 'Book Hostel Room' ? 'Check-in Date' : 'Preferred Date';
-  const budgetLabel = formData.inquiryType === 'Buy House' ? 'Purchase Budget' : 'Monthly Rent Budget';
+  const showBudgetField = [
+    "Buy House",
+    "Rent House",
+    "Rent Apartment",
+  ].includes(formData.inquiryType);
+  const showDateField = ["Book Apartment", "Book Hostel Room"].includes(
+    formData.inquiryType,
+  );
+  const dateFieldLabel =
+    formData.inquiryType === "Book Hostel Room"
+      ? "Check-in Date"
+      : "Preferred Date";
+  const budgetLabel =
+    formData.inquiryType === "Buy House"
+      ? "Purchase Budget"
+      : "Monthly Rent Budget";
 
   return (
     <div className="contact-page">
       <section className="hero-section">
         <div className="hero-copy">
-          <span className="hero-badge">Trusted Residential Management System</span>
+          <span className="hero-badge">
+            Trusted Residential Management System
+          </span>
           <h1>Let's Find Your Perfect Property</h1>
           <p>
-            Looking to buy a house, rent an apartment, or book a hostel? Send us your inquiry and our property team will help you find the right place.
+            Looking to buy a house, rent an apartment, or book a hostel? Send us
+            your inquiry and our property team will help you find the right
+            place.
           </p>
           <div className="hero-actions">
             <a href="#inquiry-form" className="primary-btn">
@@ -273,7 +300,8 @@ function ContactPage() {
           <p className="eyebrow">Property Support</p>
           <h2>Contact Our Property Team</h2>
           <p>
-            Our team is available to help you with property booking, purchasing, renting, availability, and general inquiries.
+            Our team is available to help you with property booking, purchasing,
+            renting, availability, and general inquiries.
           </p>
         </div>
         <div className="info-grid">
@@ -284,8 +312,8 @@ function ContactPage() {
                   className="info-card info-card-actionable"
                   key={card.title}
                   href={card.href}
-                  target={card.href.startsWith('http') ? '_blank' : undefined}
-                  rel={card.href.startsWith('http') ? 'noreferrer' : undefined}
+                  target={card.href.startsWith("http") ? "_blank" : undefined}
+                  rel={card.href.startsWith("http") ? "noreferrer" : undefined}
                 >
                   <div className="info-icon">{card.icon}</div>
                   <h3>{card.title}</h3>
@@ -310,13 +338,33 @@ function ContactPage() {
         <div className="inquiry-preview">
           {selectedProperty ? (
             <div className="selected-property">
-              <img src={selectedProperty.image || selectedProperty.images?.[0] || ''} alt={selectedProperty.title || selectedProperty.name || ''} className="selected-property-image" />
+              <img
+                src={
+                  selectedProperty.image || selectedProperty.images?.[0] || ""
+                }
+                alt={selectedProperty.title || selectedProperty.name || ""}
+                className="selected-property-image"
+              />
               <div className="selected-property-info">
                 <h4>{selectedProperty.title || selectedProperty.name}</h4>
-                <div className="selected-property-meta">{selectedProperty.type} • {selectedProperty.purpose || selectedProperty.saleOrRent || selectedProperty.availability || ''}</div>
-                <div className="selected-property-price">{selectedProperty.price}</div>
-                <div className="selected-property-location">{selectedProperty.address || selectedProperty.location || selectedProperty.area}</div>
-                <div className="selected-property-status">{selectedProperty.availability || selectedProperty.status}</div>
+                <div className="selected-property-meta">
+                  {selectedProperty.type} •{" "}
+                  {selectedProperty.purpose ||
+                    selectedProperty.saleOrRent ||
+                    selectedProperty.availability ||
+                    ""}
+                </div>
+                <div className="selected-property-price">
+                  {selectedProperty.price}
+                </div>
+                <div className="selected-property-location">
+                  {selectedProperty.address ||
+                    selectedProperty.location ||
+                    selectedProperty.area}
+                </div>
+                <div className="selected-property-status">
+                  {selectedProperty.availability || selectedProperty.status}
+                </div>
               </div>
             </div>
           ) : (
@@ -324,7 +372,8 @@ function ContactPage() {
               <div className="preview-image" />
               <h3>Interested in a Property?</h3>
               <p>
-                Tell us what you're looking for and our team will contact you with availability, pricing, and booking information.
+                Tell us what you're looking for and our team will contact you
+                with availability, pricing, and booking information.
               </p>
               <ul>
                 <li>✓ Quick Response</li>
@@ -341,113 +390,82 @@ function ContactPage() {
           <div className="form-heading">
             <p className="eyebrow">Inquiry Form</p>
             <h2>Property Inquiry Form</h2>
-            <p>Fill in your information and tell us which property you're interested in.</p>
+            <p>
+              Fill in your information and tell us which property you're
+              interested in.
+            </p>
           </div>
 
           <form className="inquiry-form" onSubmit={handleSubmit} noValidate>
             <div className="form-row">
               <div className="form-field">
-                <label htmlFor="fullName">Full Name</label>
+                <label htmlFor="fullName">Name</label>
                 <input
                   id="fullName"
                   name="fullName"
                   value={formData.fullName}
                   onChange={handleChange}
-                  placeholder="Enter your full name"
+                  placeholder="Enter your name"
                   pattern="[A-Za-z ]+"
-                  title="Full name can contain only letters and spaces."
+                  title="Name can contain only letters and spaces."
                 />
-                {errors.fullName && <span className="field-error">{errors.fullName}</span>}
-              </div>
-              <div className="form-field">
-                <label htmlFor="email">Email Address</label>
-                <input id="email" name="email" type="email" value={formData.email} onChange={handleChange} placeholder="Enter your email address" />
-                {errors.email && <span className="field-error">{errors.email}</span>}
+                {errors.fullName && (
+                  <span className="field-error">{errors.fullName}</span>
+                )}
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-field">
-                <label htmlFor="phone">Phone Number</label>
-                <input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleChange} placeholder="Enter your phone number" />
-                {errors.phone && <span className="field-error">{errors.phone}</span>}
-              </div>
-              <div className="form-field">
-                <label htmlFor="propertyType">Property Type</label>
-                <select id="propertyType" name="propertyType" value={formData.propertyType} onChange={handleChange}>
-                  <option value="">Select Property Type</option>
-                  <option value="House">House</option>
-                  <option value="Apartment">Apartment</option>
-                  <option value="Hostel">Hostel</option>
-                </select>
-                {errors.propertyType && <span className="field-error">{errors.propertyType}</span>}
+                <label htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  placeholder="Enter your email"
+                />
+                {errors.email && (
+                  <span className="field-error">{errors.email}</span>
+                )}
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-field">
-                <label htmlFor="inquiryType">Inquiry Type</label>
-                <select id="inquiryType" name="inquiryType" value={formData.inquiryType} onChange={handleChange}>
-                  <option value="">Select Inquiry Type</option>
-                  <option value="Buy House">Buy House</option>
-                  <option value="Rent House">Rent House</option>
-                  <option value="Book Apartment">Book Apartment</option>
-                  <option value="Rent Apartment">Rent Apartment</option>
-                  <option value="Book Hostel Room">Book Hostel Room</option>
-                  <option value="General Inquiry">General Inquiry</option>
-                </select>
-                {errors.inquiryType && <span className="field-error">{errors.inquiryType}</span>}
-              </div>
-              <div className="form-field">
-                <label htmlFor="property">Select Property</label>
-                <select id="property" name="property" value={formData.property} onChange={handleChange} disabled={!propertyList.length}>
-                  <option value="">Select a property</option>
-                  {propertyList.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
-                {errors.property && <span className="field-error">{errors.property}</span>}
-              </div>
-            </div>
-
-            {showBudgetField && (
-              <div className="form-field single-field">
-                <label htmlFor="budget">{budgetLabel}</label>
-                <input id="budget" name="budget" value={formData.budget} onChange={handleChange} placeholder="Enter your budget" />
-              </div>
-            )}
-
-            {showDateField && (
-              <div className="form-field single-field">
-                <label htmlFor="preferredDate">{dateFieldLabel}</label>
-                <input id="preferredDate" name="preferredDate" type="date" value={formData.preferredDate} onChange={handleChange} />
-              </div>
-            )}
-
-            {!showBudgetField && !showDateField && (
-              <div className="form-field single-field">
-                <label htmlFor="preferredDate">Preferred Date</label>
-                <input id="preferredDate" name="preferredDate" type="date" value={formData.preferredDate} onChange={handleChange} />
-              </div>
-            )}
-
-            <div className="form-row">
-              <div className="form-field">
-                <label htmlFor="residents">Number of Residents</label>
-                <input id="residents" name="residents" type="number" min="1" value={formData.residents} onChange={handleChange} placeholder="Enter number of residents" />
+                <label htmlFor="phone">Contact Number</label>
+                <input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  placeholder="Enter your contact number"
+                />
+                {errors.phone && (
+                  <span className="field-error">{errors.phone}</span>
+                )}
               </div>
             </div>
 
             <div className="form-field single-field">
               <label htmlFor="message">Message</label>
-              <textarea id="message" name="message" rows="5" value={formData.message} onChange={handleChange} placeholder="Tell us what you are looking for..." />
-              {errors.message && <span className="field-error">{errors.message}</span>}
+              <textarea
+                id="message"
+                name="message"
+                rows="5"
+                value={formData.message}
+                onChange={handleChange}
+                placeholder="Tell us what you are looking for..."
+              />
+              {errors.message && (
+                <span className="field-error">{errors.message}</span>
+              )}
             </div>
 
             <button type="submit" className="submit-btn">
-              Submit Property Inquiry
+              Submit
             </button>
           </form>
         </div>
@@ -484,7 +502,9 @@ function ContactPage() {
         <div>
           <p className="eyebrow">Ready to Move Forward</p>
           <h2>Ready to Find Your Next Home?</h2>
-          <p>Explore our residential properties and send us an inquiry today.</p>
+          <p>
+            Explore our residential properties and send us an inquiry today.
+          </p>
         </div>
         <div className="cta-actions">
           <Link to="/properties" className="secondary-btn">
@@ -502,13 +522,22 @@ function ContactPage() {
             <div className="success-icon">✓</div>
             <h3>Inquiry Submitted Successfully!</h3>
             <p>
-              Thank you for contacting RMS. Your property inquiry has been received. Our team will contact you shortly.
+              Thank you for contacting RMS. Your property inquiry has been
+              received. Our team will contact you shortly.
             </p>
             <div className="success-actions">
-              <button type="button" className="primary-btn" onClick={() => setShowSuccess(false)}>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => setShowSuccess(false)}
+              >
                 Close
               </button>
-              <Link to="/properties" className="secondary-btn" onClick={() => setShowSuccess(false)}>
+              <Link
+                to="/properties"
+                className="secondary-btn"
+                onClick={() => setShowSuccess(false)}
+              >
                 Back to Properties
               </Link>
             </div>

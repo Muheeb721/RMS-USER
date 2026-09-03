@@ -1,40 +1,43 @@
-const STORAGE_KEY = 'rms_price_history';
+import api from '../services/api';
 
-const normalize = (item = {}, fallbackId = Date.now()) => ({
-  id: item.id || `${fallbackId}-${Math.random().toString(16).slice(2)}`,
+const normalize = (item = {}) => ({
+  id: item._id || item.id || Date.now().toString(),
   propertyId: item.propertyId || null,
   previousPrice: item.previousPrice || null,
   newPrice: item.newPrice || null,
-  changedAt: item.changedAt || new Date().toISOString(),
+  changedAt: item.changedAt || item.createdAt || new Date().toISOString(),
 });
 
-const read = () => {
-  if (typeof window === 'undefined') return [];
+export const read = async () => {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map((p, i) => normalize(p, i + 1)) : [];
+    const res = await api.request('/analytics/price-history');
+    if (res && res.success && Array.isArray(res.data)) return res.data.map(normalize);
+    return [];
   } catch (e) {
-    console.error('read price history', e);
+    console.error('read price history failed', e);
     return [];
   }
 };
 
-const save = (records = []) => {
-  if (typeof window === 'undefined') return [];
-  const next = Array.isArray(records) ? records.map((r, i) => normalize(r, i + 1)) : [];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  window.dispatchEvent(new Event('rms-price-history-updated'));
-  return next;
+export const add = async (entry = {}) => {
+  try {
+    const payload = { propertyId: entry.propertyId, previousPrice: entry.previousPrice, newPrice: entry.newPrice, changedAt: entry.changedAt };
+    const res = await api.request('/analytics/price-history', { method: 'POST', body: payload });
+    return res && res.success ? normalize(res.data) : null;
+  } catch (e) {
+    console.error('add price history failed', e);
+    return null;
+  }
 };
 
-const add = (entry = {}) => {
-  const next = [normalize(entry, Date.now()), ...read()];
-  return save(next);
+export const listForProperty = async (propertyId) => {
+  try {
+    const all = await read();
+    return all.filter((p) => String(p.propertyId) === String(propertyId));
+  } catch (e) {
+    console.error('listForProperty failed', e);
+    return [];
+  }
 };
 
-const listForProperty = (propertyId) => read().filter((p) => String(p.propertyId) === String(propertyId));
-
-export { read, save, add, listForProperty };
-export default { read, save, add, listForProperty };
+export default { read, add, listForProperty };

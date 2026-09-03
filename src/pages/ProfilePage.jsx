@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Avatar, Button, Card, Descriptions, Input, Tag } from "antd";
+import { Avatar, Button, Card, Descriptions, Input, Tag, Spin, Alert } from "antd";
 import {
   BellOutlined,
   EditOutlined,
@@ -16,12 +16,11 @@ import { useProperties } from "../contexts/PropertyContext";
 import { hostelData } from "../data/dummyData";
 import FavoriteToggle from "../components/FavoriteToggle";
 import { sanitizeFullName } from "../utils/nameValidation";
+import api from "../services/api";
 import "./ProfilePage.css";
 
-const STORAGE_KEY = "profileData";
-
 const defaultProfile = {
-  name:"Muheeb ullah",
+  name: "Muheeb ullah",
   role: "Resident • Lahore",
   email: "amina@example.com",
   phone: "+92 300 1234567",
@@ -33,54 +32,46 @@ const defaultProfile = {
 
 function ProfilePage() {
   const { favorites = [], notifications = [] } = useSelector((state) => state.auth || {});
-  const getInitialProfile = () => {
-    if (typeof window === "undefined") {
-      return { profile: defaultProfile, hadSaved: false };
-    }
+  const [profile, setProfile] = useState(defaultProfile);
+  const [draft, setDraft] = useState(defaultProfile);
+  const [editing, setEditing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-    try {
-      // Prefer new key, but migrate from old key if present
-      const storedValue = window.localStorage.getItem(STORAGE_KEY);
-      if (storedValue) {
-        const parsedValue = JSON.parse(storedValue);
-        return { profile: { ...defaultProfile, ...parsedValue }, hadSaved: true };
-      }
-      const legacy = window.localStorage.getItem('rms_profile');
-      if (legacy) {
-        try {
-          const parsedLegacy = JSON.parse(legacy);
-          // migrate to new key
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(parsedLegacy));
-          window.localStorage.removeItem('rms_profile');
-          return { profile: { ...defaultProfile, ...parsedLegacy }, hadSaved: true };
-        } catch (err) {
-          console.error('Failed to parse legacy profile data', err);
+  useEffect(() => {
+    const loadProfile = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await api.request('/users/profile');
+        if (response && response.success && response.data) {
+          const nextProfile = {
+            ...defaultProfile,
+            ...response.data,
+            name: response.data.name || defaultProfile.name,
+            email: response.data.email || defaultProfile.email,
+            role: response.data.role || defaultProfile.role,
+            phone: response.data.phone || defaultProfile.phone,
+            address: response.data.address || defaultProfile.address,
+            image: response.data.image || "",
+          };
+          setProfile(nextProfile);
+          setDraft(nextProfile);
+          setEditing(false);
         }
+      } catch (err) {
+        console.error('Unable to load profile from backend', err);
+        setError('Unable to load profile');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error("Failed to load profile from local storage:", error);
-    }
+    };
 
-    return { profile: defaultProfile, hadSaved: false };
-  };
-
-  const { profile: initialProfile, hadSaved } = getInitialProfile();
-  const [profile, setProfile] = useState(initialProfile);
-  const [draft, setDraft] = useState({ ...defaultProfile, ...initialProfile });
-  const [editing, setEditing] = useState(!hadSaved);
+    loadProfile();
+  }, []);
 
   useEffect(() => {
     setDraft({ ...defaultProfile, ...profile });
-  }, [profile]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-      } catch (err) {
-        console.error('Failed to save profile to localStorage', err);
-      }
-    }
   }, [profile]);
 
   const handleEdit = () => {
@@ -88,7 +79,7 @@ function ProfilePage() {
     setEditing(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const nextProfile = {
       ...draft,
       name: sanitizeFullName(draft.name) || profile.name,
@@ -99,8 +90,21 @@ function ProfilePage() {
       image: draft.image || "",
     };
 
-    setProfile(nextProfile);
-    setDraft(nextProfile);
+    try {
+      const response = await api.request('/users/profile', {
+        method: 'PUT',
+        body: nextProfile,
+      });
+
+      if (response && response.success && response.data) {
+        const savedProfile = { ...defaultProfile, ...response.data };
+        setProfile(savedProfile);
+        setDraft(savedProfile);
+      }
+    } catch (error) {
+      console.error('Unable to save profile to backend', error);
+    }
+
     setEditing(false);
   };
 
@@ -275,6 +279,8 @@ function ProfilePage() {
         </aside>
 
         <main className="profile-main">
+          {loading ? <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div> : null}
+          {error ? <Alert type="error" message={error} style={{ marginBottom: 12 }} /> : null}
           <section className="profile-welcome">
             <div className="profile-welcome-top">
               <div className="profile-welcome-text">

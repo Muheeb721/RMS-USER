@@ -1,12 +1,10 @@
-import { Layout, Avatar, Dropdown } from "antd";
+import { Layout, Dropdown } from "antd";
 import {
   HomeOutlined,
   InfoCircleOutlined,
   CompassOutlined,
   DollarCircleOutlined,
   PhoneOutlined,
-  LogoutOutlined,
-  UserOutlined,
   DashboardOutlined,
 } from "@ant-design/icons";
 import { Link, NavLink } from "react-router-dom";
@@ -14,7 +12,6 @@ import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toggleTheme } from "../redux/store";
 import NotificationBell from "./Notifications/NotificationBell";
-import FavoriteBadge from './FavoriteBadge';
 import "../pages/header.css";
 
 const { Header } = Layout;
@@ -24,23 +21,64 @@ function HeaderNav() {
   const { theme } = useSelector((state) => state.auth);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  const demoMenuItems = [
+    { key: "demo-overview", label: <Link to="/demo">Demo</Link> },
+    { key: "demo-house", label: <Link to="/demo/house">Demo House</Link> },
+    { key: "demo-flat", label: <Link to="/demo/flats">Demo Flat / Apartment</Link> },
+    { key: "demo-hostel", label: <Link to="/demo/hostel">Demo Hostel</Link> },
+    { key: "demo-rooms", label: <Link to="/demo/rooms">Demo Rooms</Link> },
+    { key: "demo-apartments", label: <Link to="/demo/apartments">Demo Apartments</Link> },
+  ];
+
   const navItems = [
     { to: "/", label: "Home", icon: <HomeOutlined /> },
-    { to: "/properties", label: "Properties", icon: <CompassOutlined /> },
-    { to: "/payments", label: "Payments", icon: <DollarCircleOutlined /> },
-    { to: "/services", label: "Services", icon: <DashboardOutlined /> },
-    { to: "/demo", label: "Demo", icon: <DollarCircleOutlined /> },
     { to: "/about", label: "About", icon: <InfoCircleOutlined /> },
+    { to: "/services", label: "Services", icon: <DashboardOutlined /> },
+    { to: "/demo", label: "Demo", special: "dropdown" },
     { to: "/contact", label: "Contact", icon: <PhoneOutlined /> },
+    { to: "/properties", label: "Properties", icon: <CompassOutlined /> },
+    { to: "/ai-recommendations", label: "AI Recommendations", icon: <DashboardOutlined /> },
+    { to: "/bookings", label: "Bookings", icon: <DollarCircleOutlined /> },
+    { to: "/maintenance", label: "Maintenance", icon: <DashboardOutlined /> },
+    { to: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
+    { to: "/payments", label: "Payments", icon: <DollarCircleOutlined /> },
   ];
+
+  const renderNavItem = (item) => {
+    if (item.special === "dropdown") {
+      return (
+        <Dropdown
+          key={item.label}
+          menu={{ items: demoMenuItems }}
+          trigger={["click"]}
+          placement="bottomLeft"
+        >
+          <button type="button" className="top-nav-link dropdown-nav-button">
+            {item.label}
+          </button>
+        </Dropdown>
+      );
+    }
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={({ isActive }) =>
+          isActive ? "top-nav-link active" : "top-nav-link"
+        }
+      >
+        {item.label}
+      </NavLink>
+    );
+  };
 
   return (
     <Header
       className="topbar"
       style={{
         background: theme === "dark" ? "#0b2450" : "rgba(255,255,255,0.9)",
-        position: "sticky",
-        top: 0,
+        position: "relative",
         zIndex: 100,
         backdropFilter: "blur(16px)",
         borderBottom: "1px solid rgba(231,235,242,0.9)",
@@ -49,6 +87,7 @@ function HeaderNav() {
       <div
         style={{
           maxWidth: 1280,
+          width: "100%",
           margin: "0 auto",
           display: "flex",
           alignItems: "center",
@@ -94,17 +133,7 @@ function HeaderNav() {
         </Link>
 
         <nav className="topbar-nav">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                isActive ? "top-nav-link active" : "top-nav-link"
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {navItems.map(renderNavItem)}
         </nav>
 
         {/* Mobile hamburger button */}
@@ -120,9 +149,11 @@ function HeaderNav() {
 
         <div className="topbar-actions">
           <NotificationBell />
-          <FavoriteBadge />
-          <Link to="/payments" className="btn-primary" style={{ padding: '8px 12px', marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <DollarCircleOutlined /> Payments
+          <Link to="/dashboard" className="btn-primary" style={{ padding: '8px 12px', marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <DashboardOutlined /> Dashboard
+          </Link>
+          <Link to="/my-rent" className="btn-secondary" style={{ padding: '8px 12px', marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <DollarCircleOutlined /> My Rent
           </Link>
           <button
             type="button"
@@ -135,49 +166,49 @@ function HeaderNav() {
               fontSize: 18,
             }}
           >
-         
           </button>
           <Link to="/login" className="btn-secondary" style={{ padding: "8px 14px" }}>
             Login
           </Link>
-         <Link to="/signup" className="btn-secondary" style={{ padding: "8px 14px" }}>
-            signup
-          </Link>
-
-          {/* Get Started removed per request */}
-          <Dropdown
-            menu={{
-              items: [
-                { key: "profile", label: <Link to="/profile">Profile</Link> },
-                {
-                  key: "logout",
-                  label: <span>Logout</span>,
-                  icon: <LogoutOutlined />,
-                },
-              ],
-            }}
-            placement="bottomRight"
-          >
-            <Avatar style={{ backgroundColor: "#28b463" }} icon={<UserOutlined />} />
-          </Dropdown>
         </div>
 
         {/* Mobile fixed menu overlay (keeps header fixed) */}
         <div className={isMenuOpen ? "mobile-menu open" : "mobile-menu"}>
           <div className="mobile-menu-inner">
             <nav className="mobile-nav">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    isActive ? "top-nav-link active" : "top-nav-link"
-                  }
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {item.label}
-                </NavLink>
-              ))}
+              {navItems.map((item) => {
+                if (item.special === "dropdown") {
+                  return (
+                    <Dropdown
+                      key={item.label}
+                      menu={{ items: demoMenuItems }}
+                      trigger={["click"]}
+                      placement="bottomLeft"
+                    >
+                      <button
+                        type="button"
+                        className="top-nav-link dropdown-nav-button"
+                        onClick={() => setIsMenuOpen(false)}
+                      >
+                        {item.label}
+                      </button>
+                    </Dropdown>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      isActive ? "top-nav-link active" : "top-nav-link"
+                    }
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    {item.label}
+                  </NavLink>
+                );
+              })}
             </nav>
 
             <div className="mobile-actions">

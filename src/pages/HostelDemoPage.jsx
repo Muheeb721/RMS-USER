@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { hostelData } from '../data/dummyData';
 import './demopage.css';
+import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
 
 const categories = ['All', 'Hostel', 'Boys Hostel', 'Girls Hostel', 'Family Hostel'];
 
 function HostelDemoPage() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 
@@ -24,6 +26,16 @@ function HostelDemoPage() {
       return matchesCategory && matchesSearch;
     });
   }, [activeCategory, searchTerm]);
+
+  const handleViewProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(property.id ? `/hostels/${property.id}` : '/contact');
+  };
+
+  const handleReserveProperty = (property) => {
+    saveSelectedProperty(property);
+    navigate(`/contact?propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`);
+  };
 
   return (
     <div className="demo-page">
@@ -80,8 +92,8 @@ function HostelDemoPage() {
                   <div className="card-footer">
                     <p className="price">{hostel.monthlyFee}</p>
                     <div className="card-actions">
-                      <button type="button" className="secondary-button">View</button>
-                      <button type="button" className="details-button">Reserve</button>
+                      <button type="button" className="secondary-button" onClick={() => handleViewProperty(hostel)}>View</button>
+                      <button type="button" className="details-button" onClick={() => handleReserveProperty(hostel)}>Reserve</button>
                     </div>
                   </div>
                 </div>
