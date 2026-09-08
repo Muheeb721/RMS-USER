@@ -4,9 +4,12 @@ import { Link, useLocation } from "react-router-dom";
 import "./ContactPage.css";
 import { addNotification } from "../redux/store";
 import { createContactNotification } from "../services/notificationService.jsx";
+import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { recordDashboardSubmission } from "../utils/dashboardSubmissionStorage.jsx";
 import { add as addContactRequest } from "../utils/contactRequestsStorage.jsx";
 import { sanitizeFullName } from "../utils/nameValidation.jsx";
+import api from "../services/api.js";
+import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import {
   readSelectedProperty,
   clearSelectedProperty,
@@ -169,7 +172,7 @@ function ContactPage() {
     return nextErrors;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const nextErrors = validateForm();
@@ -188,39 +191,72 @@ function ContactPage() {
       action: "View Inquiry",
     };
 
+    const payload = {
+      fullName: formData.fullName.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      message: formData.message.trim(),
+      propertyId: selectedProperty?.id || "",
+      propertyName: selectedProperty?.title || formData.property || "Selected Property",
+      propertyType: selectedProperty?.type || formData.propertyType || "General",
+      inquiryType: "General Inquiry",
+    };
+
+    try {
+      await api.request('/contact', {
+        method: 'POST',
+        body: payload,
+      });
+    } catch (apiError) {
+      console.error('Contact API submission failed', apiError);
+    }
+
     dispatch(
       addNotification(
         createContactNotification({
-          fullName: formData.fullName.trim(),
-          inquiryType: "General Inquiry",
-          property: selectedProperty?.title || "Selected Property",
-          message: formData.message.trim(),
-          email: formData.email.trim(),
+          fullName: payload.fullName,
+          inquiryType: payload.inquiryType,
+          property: payload.propertyName,
+          message: payload.message,
+          email: payload.email,
         }),
       ),
     );
+    // persist contact notification to backend
+    try {
+      const note = createContactNotification({
+        fullName: payload.fullName,
+        inquiryType: payload.inquiryType,
+        property: payload.propertyName,
+        message: payload.message,
+        email: payload.email,
+      });
+      addStoredNotification(note);
+    } catch (e) {}
 
     const contactRecord = {
       id: `contact-${Date.now()}`,
       source: "contact",
       formType: "Contact Inquiry",
       title: "Property inquiry request",
-      category: selectedProperty?.type || "General",
+      category: selectedProperty?.type || payload.propertyType || "General",
       status: "New",
-      userName: formData.fullName.trim(),
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      propertyId: selectedProperty?.id || "",
-      propertyName: selectedProperty?.title || "Selected Property",
+      fullName: payload.fullName,
+      userName: payload.fullName,
+      email: payload.email,
+      phone: payload.phone,
+      propertyId: payload.propertyId,
+      propertyName: payload.propertyName,
       propertyImage:
         selectedProperty?.image || selectedProperty?.images?.[0] || "",
-      propertyType: selectedProperty?.type || "General",
+      propertyType: payload.propertyType,
       location: selectedProperty?.address || "General inquiry",
       price: selectedProperty?.price || "",
       bedrooms: selectedProperty?.bedrooms || "",
       bathrooms: selectedProperty?.bathrooms || "",
       area: selectedProperty?.area || "",
-      description: formData.message.trim(),
+      description: payload.message,
+      message: payload.message,
       submittedAt: new Date().toISOString(),
     };
 
@@ -229,8 +265,8 @@ function ContactPage() {
     try {
       addContactRequest({
         ...contactRecord,
-        message: formData.message.trim(),
-        inquiryType: "General Inquiry",
+        message: payload.message,
+        inquiryType: payload.inquiryType,
         createdAt: new Date().toISOString(),
       });
     } catch (e) {
@@ -291,6 +327,8 @@ function ContactPage() {
           <img
             src="https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80"
             alt="Modern residential property"
+            style={{ width: '100%', objectFit: 'cover' }}
+            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
           />
         </div>
       </section>
@@ -339,11 +377,11 @@ function ContactPage() {
           {selectedProperty ? (
             <div className="selected-property">
               <img
-                src={
-                  selectedProperty.image || selectedProperty.images?.[0] || ""
-                }
+                src={selectedProperty?.image || selectedProperty?.images?.[0] || FALLBACK_IMAGE}
                 alt={selectedProperty.title || selectedProperty.name || ""}
                 className="selected-property-image"
+                style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 8 }}
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
               />
               <div className="selected-property-info">
                 <h4>{selectedProperty.title || selectedProperty.name}</h4>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, Row, Col, Descriptions, Button, Tag, Typography, Modal, Spin } from 'antd';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import propertyService from '../services/propertyService';
 import { useProperties } from '../contexts/PropertyContext';
 import './PropertyDetailsPage.css';
 import ActionModal from '../components/ActionModal';
@@ -9,7 +11,7 @@ import VisitModal from '../components/VisitModal';
 import SimilarProperties from '../components/SimilarProperties';
 import RentalBookingModal from '../components/RentalBookingModal';
 import { listForProperty as listPriceHistory } from '../utils/priceHistoryStorage';
-import heroImg from '../assets/hero.png';
+import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { increment as incrementView, getCount as getViewCount } from '../utils/propertyViewsStorage';
 import { isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage';
 const { Text } = Typography;
@@ -25,7 +27,12 @@ const statusColorMap = {
 function PropertyDetailsPage() {
   const { id } = useParams();
   const { properties } = useProperties();
-  const property = properties.find((item) => item.id === Number(id));
+  const [propertyState, setPropertyState] = useState(null);
+  const fallbackId = id;
+
+  const findLocal = () => properties.find((item) => String(item.id) === String(id) || String(item._id) === String(id));
+
+  const property = propertyState || findLocal() || null;
   const [contactOpen, setContactOpen] = useState(false);
   const [inquiryOpen, setInquiryOpen] = useState(false);
   const [visitOpen, setVisitOpen] = useState(false);
@@ -37,11 +44,10 @@ function PropertyDetailsPage() {
   const [error, setError] = useState(null);
   const [bookingOpen, setBookingOpen] = useState(false);
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [images, setImages] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-
-  if (!property) return <div className="page-shell"><div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div></div>;
 
   useEffect(() => {
     let mounted = true;
@@ -49,32 +55,44 @@ function PropertyDetailsPage() {
       setLoading(true);
       setError(null);
       try {
-        try {
-          await incrementView(property.id);
-        } catch (e) {
-          console.warn('increment view failed', e);
+        // fetch property from backend by id (fallback to local if needed)
+        const res = await propertyService.getPropertyById(id).catch(() => null);
+        if (res && res.success && res.data) {
+          const item = res.data;
+          const imgs = Array.isArray(item.images) && item.images.length ? item.images : item.image ? [item.image] : [];
+          const normalized = {
+            id: item._id || item.id || fallbackId,
+            title: item.title || item.name || 'Untitled Property',
+            description: item.description || '',
+            price: item.price || item.rent || item.salePrice || '',
+            type: item.type || item.propertyType || item.category || 'Property',
+            location: item.location || item.address || '',
+            address: item.address || item.location || '',
+            area: item.area || '',
+            bedrooms: item.bedrooms || 0,
+            bathrooms: item.bathrooms || 0,
+            parking: item.parking || 0,
+            status: item.status || item.availability || 'Available',
+            image: imgs[0] || FALLBACK_IMAGE,
+            images: imgs.length ? imgs : [FALLBACK_IMAGE],
+            owner: item.ownerName || item.owner || 'RMS Admin',
+            contact: item.contact || '+92 300 1234567',
+          };
+          if (mounted) setPropertyState(normalized);
         }
 
-        try {
-          const cnt = await getViewCount(property.id);
-          if (mounted) setViewCount(cnt || 0);
-        } catch (e) {
-          console.warn('get view count failed', e);
-        }
+        const propId = (property && property.id) || id;
 
-        try {
-          const ph = await listPriceHistory(property.id);
-          if (mounted) setPriceHistory(ph || []);
-        } catch (e) {
-          console.warn('list price history failed', e);
-        }
+        await incrementView(propId).catch(() => null);
 
-        try {
-          const v = await isPropertyVerified(property.id);
-          if (mounted) setVerified(Boolean(v));
-        } catch (e) {
-          console.warn('is verified check failed', e);
-        }
+        const cnt = await getViewCount(propId).catch(() => 0);
+        if (mounted) setViewCount(cnt || 0);
+
+        const ph = await listPriceHistory(propId).catch(() => []);
+        if (mounted) setPriceHistory(ph || []);
+
+        const v = await isPropertyVerified(propId).catch(() => false);
+        if (mounted) setVerified(Boolean(v));
       } catch (e) {
         if (mounted) setError('Failed to load property details');
       } finally {
@@ -82,7 +100,7 @@ function PropertyDetailsPage() {
       }
     })();
     return () => { mounted = false; };
-  }, [property?.id]);
+  }, [property?.id, id]);
 
   useEffect(() => {
     // build images list for gallery
@@ -91,7 +109,7 @@ function PropertyDetailsPage() {
         ? property.images.slice()
         : property.image ? [property.image] : [];
       // fallback default image if empty
-      if (!imgs.length) imgs.push(heroImg);
+      if (!imgs.length) imgs.push(FALLBACK_IMAGE);
       setImages(imgs);
       setCurrentIndex(0);
     } catch (e) {
@@ -100,6 +118,8 @@ function PropertyDetailsPage() {
   }, [property?.id]);
 
   useEffect(() => {
+    if (!property?.id) return undefined;
+
     const refreshViews = async () => {
       try {
         const cnt = await getViewCount(property.id);
@@ -132,6 +152,16 @@ function PropertyDetailsPage() {
     };
   }, [property?.id]);
 
+  if (!property) {
+    return (
+      <div className="page-shell">
+        <div style={{ textAlign: 'center', padding: 40 }}>
+          <Spin size="large" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page-shell">
       <section className="section-card">
@@ -144,6 +174,7 @@ function PropertyDetailsPage() {
                   src={images[currentIndex]}
                   style={{ width: '100%', height: 420, objectFit: 'cover', borderRadius: 6 }}
                   onClick={() => setLightboxOpen(true)}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
                 />
                 {images.length > 1 && (
                   <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}>
@@ -169,6 +200,7 @@ function PropertyDetailsPage() {
                       alt={`${property.title} ${idx + 1}`}
                       onClick={() => setCurrentIndex(idx)}
                       style={{ width: 84, height: 64, objectFit: 'cover', borderRadius: 6, cursor: 'pointer', border: idx === currentIndex ? '2px solid #28b463' : '1px solid #e6eef6' }}
+                      onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
                     />
                   ))}
                 </div>
@@ -176,7 +208,7 @@ function PropertyDetailsPage() {
 
               <Modal visible={lightboxOpen} footer={null} onCancel={() => setLightboxOpen(false)} centered width={'80%'}>
                 <div style={{ textAlign: 'center' }}>
-                  <img src={images[currentIndex]} alt={property.title} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
+                  <img src={images[currentIndex]} alt={property.title} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
                 </div>
               </Modal>
 
@@ -213,7 +245,29 @@ function PropertyDetailsPage() {
                 <Descriptions.Item label="Contact">{property.contact}</Descriptions.Item>
               </Descriptions>
               <div className="card-actions">
-                <Button type="primary" onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); navigate('/contact'); }}>Contact About This Property</Button>
+                <Button
+                  type="primary"
+                  onClick={async () => {
+                    if (!isAuthenticated) {
+                      const params = new URLSearchParams();
+                      params.set('propertyTitle', property.title || property.name || '');
+                      params.set('propertyType', property.type || property.propertyType || '');
+                      navigate(`/login?redirect=${encodeURIComponent('/contact?' + params.toString())}`);
+                      return;
+                    }
+
+                    try {
+                      const m = await import('../utils/selectedPropertyStorage.jsx');
+                      await m.saveSelectedProperty(property);
+                    } catch (e) {
+                      console.warn('Save selected property failed, proceeding to contact page', e);
+                    }
+
+                    navigate('/contact');
+                  }}
+                >
+                  Contact About This Property
+                </Button>
                 <Button onClick={() => setVisitOpen(true)}>Schedule a Visit</Button>
                 {property.transactionType === 'Rent' && (
                   <Button type="primary" onClick={() => setBookingOpen(true)} style={{ background: '#28b463', borderColor: '#28b463' }}>Rent Now</Button>

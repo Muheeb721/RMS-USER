@@ -4,6 +4,7 @@ import FavoriteToggle from '../../components/FavoriteToggle';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import './home-redesign.css';
+import { FALLBACK_IMAGE, getPrimaryImage } from '../../utils/imageUtils';
 
 export default function FeaturedProperties({items}){
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function FeaturedProperties({items}){
       <Row gutter={[16,16]}>
         {items.map((property)=> (
           <Col xs={24} sm={12} md={8} key={property.id}>
-            <Card className="property-card" cover={<img alt={property.title} src={property.image} />}>
+            <Card className="property-card" cover={<img alt={property.title} src={getPrimaryImage(property) || FALLBACK_IMAGE} loading="lazy" style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 12 }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} /> }>
               <div className="card-body">
                 <div className="card-top-row">
                   <Tag color={property.transactionType==='Rent' ? 'cyan' : 'blue'}>{property.transactionType==='Rent' ? 'FOR RENT' : property.type}</Tag>

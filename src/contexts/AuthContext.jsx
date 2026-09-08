@@ -12,7 +12,18 @@ const readStoredUser = () => {
   if (typeof window === 'undefined') return null;
   try {
     const saved = window[USER_KEY] || null;
-    return saved && typeof saved === 'object' ? saved : null;
+    if (saved && typeof saved === 'object') return saved;
+    // fallback to localStorage-stored session (persisted on login)
+    try {
+      const raw = window.localStorage.getItem('rms_auth_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed;
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
   } catch (error) {
     console.warn('Unable to read stored user from memory', error);
     return null;
@@ -22,7 +33,7 @@ const readStoredUser = () => {
 export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return window[TOKEN_KEY] || '';
+    return window[TOKEN_KEY] || window.localStorage.getItem('rms_token') || '';
   });
 
   const [user, setUser] = useState(() => readStoredUser() || {
@@ -66,7 +77,21 @@ export function AuthProvider({ children }) {
       isLoggedIn: false,
     });
     setToken('');
+    // clear persisted session traces
+    if (typeof window !== 'undefined') {
+      try {
+        delete window.__RMS_AUTH_TOKEN;
+        delete window.__rms_inmemory_token;
+        window.localStorage.removeItem('rms_auth_session');
+        window.localStorage.removeItem('rms_user_role');
+        window.localStorage.removeItem('rms_admin_auth');
+        window.localStorage.removeItem('rms_token');
+      } catch (e) {
+        // ignore
+      }
+    }
   };
+
 
   const isAuthenticated = Boolean(token || user?.isLoggedIn);
   const isAdmin = ['admin', 'owner', 'manager'].includes(normalizeRole(user?.role));

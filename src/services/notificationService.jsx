@@ -48,7 +48,15 @@ export const readSessionUser = () => {
   if (typeof window === 'undefined') return null;
   try {
     const stored = window[SESSION_STORAGE_KEY] || null;
-    return stored ? sanitizeUser(stored) : null;
+    if (stored) return sanitizeUser(stored);
+    // fallback to localStorage persisted session
+    try {
+      const raw = window.localStorage.getItem('rms_auth_session');
+      if (raw) return sanitizeUser(JSON.parse(raw));
+    } catch (e) {
+      // ignore
+    }
+    return null;
   } catch (error) {
     console.error('Unable to read session user from memory:', error);
     return null;
@@ -210,13 +218,21 @@ export const deleteNotificationOnServer = async (id) => {
 
 export const createNotificationOnServer = async (payload = {}) => {
   try {
-    // backend admin create route is /api/notifications/create
-    const res = await apiClient.post('/notifications/create', payload);
+    const sessionUser = readSessionUser();
+    const normalized = { ...payload };
+    const userId = normalized.userId || sessionUser?.id || sessionUser?.email || null;
+    if (userId) normalized.userId = userId;
+    if (!normalized.userId) {
+      console.warn('Notification create skipped: userId unavailable for server-backed notification.');
+      return { success: false, message: 'userId required' };
+    }
+
+    const res = await apiClient.post('/notifications/create', normalized);
     const it = res?.data?.data || null;
     return { success: true, data: it };
   } catch (error) {
     console.warn('Create notification on server failed:', error);
-    return { success: false };
+    return { success: false, message: error?.response?.data?.message || 'Unable to create notification.' };
   }
 };
 

@@ -15,6 +15,7 @@ import {
 } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../redux/store';
+import { useAuth } from '../contexts/AuthContext';
 import './Sidebar.css';
 
 function Sidebar({ collapsed, onToggle }) {
@@ -22,8 +23,14 @@ function Sidebar({ collapsed, onToggle }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const auth = useSelector((s)=>s.auth || {});
+  const authContext = useAuth();
 
   const handleLogout = () => {
+    try {
+      if (authContext && typeof authContext.logout === 'function') authContext.logout();
+    } catch (e) {
+      // ignore
+    }
     dispatch(logout());
     navigate('/login');
   };

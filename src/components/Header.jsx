@@ -7,7 +7,7 @@ import {
   PhoneOutlined,
   DashboardOutlined,
 } from "@ant-design/icons";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { toggleTheme } from "../redux/store";
@@ -20,6 +20,17 @@ function HeaderNav() {
   const dispatch = useDispatch();
   const { theme } = useSelector((state) => state.auth);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleLoginNavigation = (event) => {
+    if (event && typeof event.preventDefault === 'function') event.preventDefault();
+    try {
+      navigate('/login');
+    } catch (e) {
+      // fallback to full navigation
+      window.location.href = '/login';
+    }
+  };
 
   const demoMenuItems = [
     { key: "demo-overview", label: <Link to="/demo">Demo</Link> },
@@ -167,7 +178,7 @@ function HeaderNav() {
             }}
           >
           </button>
-          <Link to="/login" className="btn-secondary" style={{ padding: "8px 14px" }}>
+          <Link to="/login" className="btn-secondary" style={{ padding: "8px 14px" }} onClick={handleLoginNavigation}>
             Login
           </Link>
         </div>
@@ -212,7 +223,7 @@ function HeaderNav() {
             </nav>
 
             <div className="mobile-actions">
-              <Link to="/login" className="btn-secondary" onClick={() => setIsMenuOpen(false)} style={{ padding: '8px 14px' }}>Login</Link>
+              <Link to="/login" className="btn-secondary" onClick={(e) => { setIsMenuOpen(false); handleLoginNavigation(e); }} style={{ padding: '8px 14px' }}>Login</Link>
               <Link to="/signup" className="btn-secondary" onClick={() => setIsMenuOpen(false)} style={{ padding: '8px 14px' }}>Signup</Link>
               {/* Get Started removed from mobile menu per request */}
             </div>

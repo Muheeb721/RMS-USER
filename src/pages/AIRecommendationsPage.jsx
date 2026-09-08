@@ -5,6 +5,7 @@ import { useProperties } from '../contexts/PropertyContext';
 import { getRecommendations } from '../services/recommendationService.jsx';
 import propertyService from '../services/propertyService';
 import FavoriteToggle from '../components/FavoriteToggle';
+import { FALLBACK_IMAGE, getPrimaryImage } from '../utils/imageUtils';
 
 const defaultPreferences = {
   budget: 1500000,
@@ -101,7 +102,7 @@ function AIRecommendationsPage() {
                 <div key={property.id} style={{ border: '1px solid #eef2f8', borderRadius: 16, padding: 12, marginBottom: 12 }}>
                   <Row gutter={[12, 12]} align="middle">
                     <Col xs={24} md={8}>
-                      <img src={property.image} alt={property.title} style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 12 }} />
+                      <img src={getPrimaryImage(property) || FALLBACK_IMAGE} alt={property.title} style={{ width: '100%', height: 150, objectFit: 'cover', borderRadius: 12 }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src = FALLBACK_IMAGE; }} />
                     </Col>
                     <Col xs={24} md={16}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>

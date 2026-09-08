@@ -3,29 +3,44 @@ import { CheckCircleOutlined } from '@ant-design/icons';
 import { add as addInquiry } from '../utils/propertyInquiriesStorage.jsx';
 import { createContactNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
+import api from '../services/api.js';
 
 function InquiryModal({ open, onClose, property, onSubmitted }) {
   const [form] = Form.useForm();
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
+    form.validateFields().then(async (values) => {
       const payload = {
-        name: values.name,
+        fullName: values.name,
         phone: values.phone,
         email: values.email,
         propertyId: property?.id,
-        propertyTitle: property?.title,
+        propertyName: property?.title,
+        propertyType: property?.type || 'Property',
         preferredContactMethod: values.preferredContactMethod,
         message: values.message,
-        status: 'New',
-        createdAt: new Date().toISOString(),
+        inquiryType: 'Property Inquiry',
       };
 
-      addInquiry(payload);
-
-      // add a notification
       try {
-        const note = createContactNotification({ fullName: payload.name, inquiryType: 'Property Inquiry', property: payload.propertyTitle, message: payload.message, email: payload.email });
+        await api.request('/contact', {
+          method: 'POST',
+          body: payload,
+        });
+      } catch (error) {
+        console.error('Inquiry API submission failed', error);
+      }
+
+      addInquiry({
+        ...payload,
+        name: values.name,
+        propertyTitle: property?.title,
+        status: 'New',
+        createdAt: new Date().toISOString(),
+      });
+
+      try {
+        const note = createContactNotification({ fullName: payload.fullName, inquiryType: payload.inquiryType, property: payload.propertyName, message: payload.message, email: payload.email });
         addStoredNotification(note);
       } catch (e) {
         console.error('notify inquiry', e);

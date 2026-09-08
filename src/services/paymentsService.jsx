@@ -35,10 +35,22 @@ export const createPayment = async (payload = {}) => {
 export const getPayments = async () => {
   try {
     const res = await api.request('/payments/me');
-    if (res && res.success && Array.isArray(res.data)) return res.data;
-    return [];
+    if (res && res.success && Array.isArray(res.data) && res.data.length) return res.data;
   } catch (e) {
-    console.error('getPayments failed', e);
+    // ignore API errors and fall back to client storage
+  }
+
+  return getPaymentsFallback();
+};
+
+// Client-side fallback to read payments stored in localStorage when API isn't available
+export const getPaymentsFallback = () => {
+  try {
+    if (typeof window === 'undefined') return [];
+    const raw = window.localStorage.getItem('rms_payments') || '[]';
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
     return [];
   }
 };

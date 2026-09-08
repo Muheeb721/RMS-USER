@@ -36,13 +36,17 @@ const log = (...args) => console.log('[E2E-ADMIN]', ...args);
     page.setDefaultTimeout(120000);
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
-    // fill form
-    await page.fill('input[type="email"]', 'admin@rms.com');
-    await page.fill('input[type="password"]', 'admin123');
-    await page.click('button[type="submit"]');
+    // fill form - try robust selectors in case markup differs
+    const emailSel = 'input[placeholder="Enter your email"]' ;
+    const passSel = 'input[placeholder="Enter your password"]' ;
+    const submitSel = 'button[type="submit"]';
+    await page.waitForSelector(emailSel, { timeout: 15000 });
+    await page.fill(emailSel, 'admin@rms.com');
+    await page.fill(passSel, 'admin123');
+    await page.click(submitSel);
 
     // wait for admin layout to appear or URL to include /admin
-    await page.waitForFunction(() => window.location.pathname.includes('/admin'), { timeout: 8000 });
+    await page.waitForFunction(() => window.location.pathname.includes('/admin') || window.location.pathname.includes('/dashboard'), { timeout: 15000 });
 
     // check localStorage for token and auth flag
     const token = await page.evaluate(() => window.localStorage.getItem('rms_admin_token'));

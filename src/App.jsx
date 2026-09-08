@@ -7,7 +7,8 @@ import 'antd/dist/reset.css';
 import { store } from './redux/store';
 import AppRoutes from './routes/AppRoutes';
 import { useEffect } from 'react';
-import { fetchNotificationsFromServer } from './services/notificationService.jsx';
+import { fetchNotificationsFromServer, saveSessionUser } from './services/notificationService.jsx';
+import { login } from './redux/store';
 import favoriteService from './services/favoriteService';
 import { setNotifications, setFavorites } from './redux/store';
 import { PropertyProvider } from './contexts/PropertyContext';
@@ -18,6 +19,21 @@ function App() {
     const dispatch = useDispatch();
 
     useEffect(() => {
+      // hydrate in-memory session from localStorage if present (useful for dev/e2e)
+      try {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('rms_auth_session') : null;
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.email) {
+            saveSessionUser(parsed);
+            // also update redux store so pages relying on state.auth.user react immediately
+            // dispatch login with sanitized payload
+            // eslint-disable-next-line no-unused-expressions
+            parsed && parsed.email && dispatch(login(parsed));
+          }
+        }
+      } catch (e) {}
+
       const token = typeof window !== 'undefined' ? window.__RMS_AUTH_TOKEN || null : null;
       if (!token) return;
 

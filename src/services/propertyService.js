@@ -1,8 +1,10 @@
 import api from './api';
 
 export const listProperties = async (params = {}) => {
-  const q = params.q ? `?q=${encodeURIComponent(params.q)}` : '';
-  const url = `/properties${q}`;
+  // request a larger default limit so demo pages receive all seeded demo properties
+  const q = params.q ? `&q=${encodeURIComponent(params.q)}` : '';
+  const limit = params.limit || 1000;
+  const url = `/properties?limit=${limit}${q}`;
   try {
     const res = await api.request(url);
     return res;

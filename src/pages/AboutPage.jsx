@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import './AboutPage.css';
+import { FALLBACK_IMAGE } from '../utils/imageUtils';
 
 const benefits = [
   { title: 'Easy to Use', icon: '✓' },
@@ -24,13 +25,13 @@ function AboutPage() {
           </div>
         </div>
         <div className="hero-visual">
-          <img src="https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1400&q=80" alt="Luxury apartment" />
+          <img src="https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1400&q=80" alt="Luxury apartment" style={{ width: '100%', objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
         </div>
       </section>
 
       <section className="who-we-are-section" id="about">
         <div className="who-we-are-image">
-          <img src="https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1200&q=80" alt="Residential community" />
+          <img src="https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1200&q=80" alt="Residential community" style={{ width: '100%', objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
         </div>
         <div className="who-we-are-copy">
           <span className="section-tag green">WHO WE ARE</span>
@@ -108,7 +109,7 @@ function AboutPage() {
 
       <section className="cta-section" id="contact">
         <div className="cta-image">
-          <img src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1400&q=80" alt="Premium property" />
+          <img src="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1400&q=80" alt="Premium property" style={{ width: '100%', objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
         </div>
         <div className="cta-copy">
           <h2>Ready to Manage Your Property Smarter?</h2>

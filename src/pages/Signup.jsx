@@ -8,6 +8,8 @@ import {
   createLoginNotification,
   createSignupNotification,
 } from "../services/notificationService.jsx";
+import { addStoredNotification } from '../utils/notificationsStorage.jsx';
+import authService from '../services/authService';
 import { sanitizeFullName } from "../utils/nameValidation.jsx";
 import "./Signup.css";
 
@@ -79,19 +81,16 @@ function Signup() {
         role: form.accountType === "owner" ? "owner" : "resident",
       };
 
-      const result = await fetch((import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api') + '/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await result.json();
-      if (!result.ok || !json?.success) {
-        throw new Error(json?.message || 'Signup failed');
+      const res = await authService.signup(payload);
+      const success = Boolean(res?.success ?? res?.data?.success ?? res?.data?.result?.success);
+      if (!res || !success) {
+        throw new Error(res?.message || res?.data?.message || 'Signup failed');
       }
 
-      const token = json?.data?.token;
-      const userPayload = json?.data?.user || {};
+      const data = res?.data ?? {};
+      const inner = data?.result ?? data;
+      const token = inner?.token ?? data?.token ?? res?.token;
+      const userPayload = inner?.user ?? data?.user ?? res?.user ?? {};
       const user = saveSessionUser({
         name: userPayload.name || form.name.trim(),
         email: userPayload.email || form.email.trim(),
@@ -107,8 +106,11 @@ function Signup() {
       }
 
       dispatch(login(user));
-      dispatch(addNotification(createLoginNotification(user)));
-      dispatch(addNotification(createSignupNotification(user)));
+      const loginNote = createLoginNotification(user);
+      const signupNote = createSignupNotification(user);
+      dispatch(addNotification(loginNote));
+      dispatch(addNotification(signupNote));
+      try { addStoredNotification(loginNote); addStoredNotification(signupNote); } catch (e) {}
       toast.success(`Welcome to RMS, ${user.name}!`);
       const nextRoute = form.accountType === 'owner' || user.role === 'admin' || user.role === 'owner' || user.role === 'manager'
         ? '/admin'

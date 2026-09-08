@@ -16,19 +16,22 @@ function MyRentPage() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
 
+  const refreshBookings = async () => {
+    try {
+      const response = await api.request('/bookings/me');
+      if (response && response.success) {
+        setBookings(response.data || []);
+      }
+    } catch (error) {
+      console.error('Unable to load bookings from backend', error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       const nextRecords = await read();
       setRecords(nextRecords);
-
-      try {
-        const response = await api.request('/bookings/me');
-        if (response && response.success) {
-          setBookings(response.data || []);
-        }
-      } catch (error) {
-        console.error('Unable to load bookings from backend', error);
-      }
+      await refreshBookings();
     };
 
     loadData();
@@ -126,7 +129,12 @@ function MyRentPage() {
               <Table dataSource={summary.records} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
               <h3 style={{ marginTop: 24 }}>My Rental Bookings</h3>
               <Table dataSource={bookings} columns={bookingColumns} rowKey="id" pagination={{ pageSize: 8 }} />
-              <PaymentModal open={paymentOpen} booking={selectedBooking} onClose={(ok) => { setPaymentOpen(false); setSelectedBooking(null); setBookings(readBookings()); if (ok) {/* optional toast */} }} />
+              <PaymentModal open={paymentOpen} booking={selectedBooking} onClose={async (ok) => {
+                setPaymentOpen(false);
+                setSelectedBooking(null);
+                await refreshBookings();
+                if (ok) { /* optional toast */ }
+              }} />
             </>
           )}
         </div>

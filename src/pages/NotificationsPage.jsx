@@ -21,6 +21,7 @@ import {
   readStoredNotifications,
   saveStoredNotifications,
 } from "../utils/notificationsStorage.jsx";
+import { useAuth } from '../contexts/AuthContext';
 import { fetchNotificationsFromServer, markAllNotificationsOnServer, deleteNotificationOnServer } from '../services/notificationService.jsx';
 import {
   markAllNotificationsAsRead,
@@ -156,29 +157,34 @@ function NotificationsPage() {
     const load = async () => {
       setLoading(true);
       setError(null);
-      // primary: try server
+
+      const fallbackNotifications = initialNotifications.map(normalizeIncoming);
+
       try {
-        const res = await fetchNotificationsFromServer();
-        if (res.success && Array.isArray(res.data) && res.data.length) {
-          if (!mounted) return;
-          const normalized = res.data.map(normalizeIncoming);
-          setNotificationsList(normalized);
-          dispatch(setReduxNotifications(normalized));
-          saveStoredNotifications(normalized);
-          setLoading(false);
-          return;
+        // Prefer backend when the user is authenticated (use auth context or token)
+        const isAuthed = Boolean(window.__RMS_AUTH_TOKEN || window.__rms_inmemory_token || (window.localStorage.getItem && window.localStorage.getItem('rms_auth_session')));
+        if (isAuthed) {
+          const res = await fetchNotificationsFromServer();
+          if (res && res.success && Array.isArray(res.data) && res.data.length) {
+            if (!mounted) return;
+            const normalized = res.data.map(normalizeIncoming);
+            setNotificationsList(normalized);
+            dispatch(setReduxNotifications(normalized));
+            saveStoredNotifications(normalized);
+            setLoading(false);
+            return;
+          }
         }
       } catch (e) {
-        // ignore server failure, will fallback to stored
         console.warn('fetch notifications failed', e);
       }
 
       try {
-        const merged = readStoredNotifications(initialNotifications);
+        const merged = fallbackNotifications;
         if (!storedNotifications || storedNotifications.length === 0) {
           if (!mounted) return;
-          setNotificationsList(merged.map(normalizeIncoming));
-          dispatch(setReduxNotifications(merged.map(normalizeIncoming)));
+          setNotificationsList(merged);
+          dispatch(setReduxNotifications(merged));
         } else {
           if (!mounted) return;
           setNotificationsList(storedNotifications.map(normalizeIncoming));
@@ -196,7 +202,7 @@ function NotificationsPage() {
     return () => {
       mounted = false;
     };
-  }, [dispatch]);
+  }, [dispatch, storedNotifications]);
 
   const normalizeIncoming = (it) => {
     const id = it.id || it._id || it._id?.toString() || Date.now();
@@ -468,7 +474,7 @@ function NotificationsPage() {
                         </div>
                         <p>{item.message}</p>
                       </div>
-                      <span className="notification-time">{item.time}</span>
+                      <span className="notification-time">{item.time}</span> 
                     </div>
                     <div className="notification-footer">
                       <div className="notification-meta">

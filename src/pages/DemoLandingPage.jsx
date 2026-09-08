@@ -25,10 +25,8 @@ function DemoLandingPage() {
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
           <Link to="/demo/house" className="btn-primary">House View</Link>
-          <Link to="/demo/hostel" className="btn-secondary">Hostel View</Link>
-          <Link to="/demo/flats" className="btn-ghost">Flats View</Link>
-          <Link to="/demo/rooms" className="btn-ghost">Rooms View</Link>
-          <Link to="/demo/apartments" className="btn-ghost">Apartments View</Link>
+          <Link to="/demo/apartments" className="btn-secondary">Apartment View</Link>
+          <Link to="/demo/flats" className="btn-ghost">Flat View</Link>
         </div>
       </div>
     </div>

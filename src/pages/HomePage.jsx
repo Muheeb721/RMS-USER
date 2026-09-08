@@ -27,7 +27,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
-import { hostelData, popularAreas, stats, reviews } from "../data/dummyData";
+import { hostelData, popularAreas, stats, reviews, propertyData } from "../data/dummyData";
 import { useProperties } from "../contexts/PropertyContext";
 import FavoriteToggle from '../components/FavoriteToggle';
 import ChatBot from "../components/ChatBot/ChatBot";
@@ -44,6 +44,8 @@ import ActionModal from "../components/ActionModal";
 import { toast } from "react-toastify";
 import RentalBookingModal from '../components/RentalBookingModal';
 // dashboard submissions are handled on the dedicated Dashboard page
+import { FALLBACK_IMAGE } from '../utils/imageUtils';
+import { getPrimaryImage } from '../utils/imageUtils';
 
 function HomePage() {
   const [selectedListing, setSelectedListing] = useState(null);
@@ -80,6 +82,110 @@ function HomePage() {
   const [rentalSelected, setRentalSelected] = useState(null);
   const [rentalBookingOpen, setRentalBookingOpen] = useState(false);
 
+  const normalizePropertyType = (property) => String(property?.type || property?.propertyType || property?.category || '').trim();
+
+  const baseProperties = Array.isArray(properties) && properties.length > 0 ? properties : propertyData;
+  const getCategoryProperties = (categoryName) => {
+    const normalizedCategory = categoryName.toLowerCase();
+    const matches = baseProperties.filter((property) => {
+      const typeValue = normalizePropertyType(property).toLowerCase();
+      return typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
+    });
+
+    if (matches.length >= 3) return matches.slice(0, 3);
+
+    const fallbackMatches = propertyData.filter((property) => {
+      const typeValue = normalizePropertyType(property).toLowerCase();
+      return typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
+    });
+
+    return [...matches, ...fallbackMatches.filter((property) => !matches.some((item) => item.id === property.id))].slice(0, 3);
+  };
+
+  const houseProperties = getCategoryProperties('house');
+  const apartmentProperties = getCategoryProperties('apartment');
+  const flatProperties = getCategoryProperties('flat');
+  const featuredHouseProperties = [...houseProperties].sort((a, b) => {
+    const lowA = String(a.title || '').toLowerCase();
+    const lowB = String(b.title || '').toLowerCase();
+    const order = { '2 storey house': 1, '5 storey house': 2, '7 storey house': 3 };
+    return (order[lowA] || 99) - (order[lowB] || 99);
+  }).slice(0, 3);
+
+  const handleContactProperty = (property, mode = 'sale') => {
+    const title = encodeURIComponent(property?.title || '');
+    const type = encodeURIComponent(normalizePropertyType(property) || 'Property');
+    const inquiryType = encodeURIComponent(mode === 'rent' ? 'Rent Inquiry' : mode === 'sale' ? 'Sale Inquiry' : 'Property Inquiry');
+    navigate(`/contact?propertyTitle=${title}&propertyType=${type}&inquiryType=${inquiryType}`);
+  };
+
+  const handleRentProperty = (property) => {
+    setRentalSelected(property);
+    setRentalBookingOpen(true);
+  };
+
+  const renderCategoryShowcase = (title, items, accentColor = '#0f172a', overlayText = '') => (
+    <section className="hr-section home-category-section" key={title}>
+      <div className="section-header">
+        <div>
+          <h3 className="section-title">{title}</h3>
+          <p className="section-sub">Premium {title.toLowerCase()} listings with curated images.</p>
+        </div>
+        <Link to="/properties" className="btn-ghost">View all</Link>
+      </div>
+
+      <Row gutter={[18, 18]} className="home-category-grid" style={{ marginTop: 12 }}>
+        {(items && items.length ? items.slice(0, 3) : []).map((property) => (
+          <Col xs={24} sm={12} md={8} key={property.id || `${title}-${property.title}`}>
+            <Card
+              cover={
+                <div className="home-category-image-wrap">
+                  <img
+                    alt={property.title}
+                    src={getPrimaryImage(property) || FALLBACK_IMAGE}
+                    loading="lazy"
+                    style={{ width: '100%', height: 260, objectFit: 'cover' }}
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = FALLBACK_IMAGE;
+                    }}
+                  />
+                  {overlayText ? (
+                    <div className="home-category-overlay">{overlayText}</div>
+                  ) : null}
+                </div>
+              }
+              className="property-card home-category-card"
+            >
+              <div className="card-body">
+                <div className="card-top-row">
+                  <Tag color={accentColor}>FEATURED</Tag>
+                  <span className="card-price">{property.price || property.rentPrice || ''}</span>
+                </div>
+                <div className="card-title">{property.title}</div>
+                <div className="card-address">{property.address || property.location}</div>
+                <div className="meta-row">
+                  <span className="meta-pill">{property.bedrooms || 0} beds</span>
+                  <span className="meta-pill">{property.bathrooms || 0} baths</span>
+                  <span className="meta-pill">{property.area || 'Area'}</span>
+                </div>
+                <div className="card-actions">
+                  <Button onClick={() => handleContactProperty(property, title === 'Flats' ? 'rent' : 'sale')}>
+                    {title === 'Houses' ? 'House Sale' : title === 'Apartments' ? 'Apartment Enquiry' : 'Rent Inquiry'}
+                  </Button>
+                  <Button type="primary" onClick={() => handleRentProperty(property)}>
+                    {title === 'Flats' ? 'Rent Now' : 'Book Now'}
+                  </Button>
+                  <FavoriteToggle item={property} label="Save" />
+                </div>
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
+    </section>
+  );
+
   // no inline dashboard entries on home page
 
   const handleNewsletterSignup = () => {
@@ -107,84 +213,49 @@ function HomePage() {
         </div>
       </motion.div>
 
-      <FeaturedProperties items={properties.slice(0,4)} />
-
-      {/* Properties For Sale section */}
-      {properties.filter(p => p.transactionType === 'Sale').length > 0 && (
-        <section className="hr-section">
-          <div className="section-header">
-            <div>
-              <h3 className="section-title">Properties For Sale</h3>
-              <p className="section-sub">House and Apartment listings for sale.</p>
-            </div>
-            <Link to="/properties?transaction=Sale" className="btn-ghost">View all sales</Link>
+      <section className="section-card home-featured-section">
+        <div className="section-header">
+          <div>
+            <h3 className="section-title">Featured Houses</h3>
+            <p className="section-sub">Curated premium homes with distinct, property-specific imagery.</p>
           </div>
-          <Row gutter={[16,16]} style={{ marginTop: 8 }}>
-            {properties.filter(p => p.transactionType === 'Sale').slice(0,6).map((property) => (
-              <Col xs={24} sm={12} md={8} key={property.id}>
-                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
-                  <div className="card-body">
-                    <div className="card-top-row">
-                      <Tag color="gold">FOR SALE</Tag>
-                      <span className="card-price">{property.price}</span>
-                    </div>
-                    <div className="card-title">{property.title}</div>
-                    <div className="card-address">{property.address}</div>
-                    <div className="meta-row">
-                      <span className="meta-pill">{property.bedrooms} beds</span>
-                      <span className="meta-pill">{property.bathrooms} baths</span>
-                      <span className="meta-pill">{property.area}</span>
-                    </div>
-                    <div className="card-actions">
-                      <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
-                      <FavoriteToggle item={property} label="Save" />
-                    </div>
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </section>
-      )}
+          <Link to="/properties?type=House" className="btn-ghost">Browse all houses</Link>
+        </div>
 
-      {properties.filter(p => p.transactionType === 'Rent').length > 0 && (
-        <section className="hr-section">
-          <div className="section-header">
-            <div>
-              <h3 className="section-title">Properties for Rent</h3>
-              <p className="section-sub">Flats and Rooms available for immediate move-in.</p>
-            </div>
-            <Link to="/properties?transaction=Rent" className="btn-ghost">View all rents</Link>
-          </div>
-
-          <Row gutter={[16,16]} style={{ marginTop: 8 }}>
-            {properties.filter(p => p.transactionType === 'Rent').slice(0,8).map((property) => (
-              <Col xs={24} md={12} lg={6} key={property.id}>
-                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
-                  <div className="card-body">
-                    <div className="card-top-row">
-                      <Tag color="cyan">FOR RENT</Tag>
-                      <span className="card-price">{property.rentPrice || property.price}</span>
-                    </div>
-                    <div className="card-title">{property.title}</div>
-                    <div className="card-address">{property.address}</div>
-                    <div className="meta-row">
-                      <span className="meta-pill">{property.bedrooms} beds</span>
-                      <span className="meta-pill">{property.bathrooms} baths</span>
-                      <span className="meta-pill">{property.area}</span>
-                    </div>
-                    <div className="card-actions">
-                      <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
-                      <FavoriteToggle item={property} label="Save" />
-                      <Button type="primary" onClick={() => { setRentalSelected(property); setRentalBookingOpen(true); }}>Rent Now</Button>
-                    </div>
+        <Row gutter={[20, 20]} style={{ marginTop: 12 }}>
+          {(featuredHouseProperties.length ? featuredHouseProperties : houseProperties).map((property) => (
+            <Col xs={24} md={12} lg={8} key={property.id || property.title}>
+              <Card className="home-feature-card" cover={
+                <div className="home-feature-image">
+                  <img alt={property.title} src={getPrimaryImage(property) || FALLBACK_IMAGE} loading="lazy" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
+                </div>
+              }>
+                <div className="card-body">
+                  <div className="card-top-row">
+                    <Tag color="gold">{property.floors || '2 Storey'}</Tag>
+                    <span className="card-price">{property.price || property.rentPrice || 'Contact'}</span>
                   </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </section>
-      )}
+                  <div className="card-title">{property.title}</div>
+                  <div className="card-address">{property.address || property.location}</div>
+                  <div className="meta-row">
+                    <span className="meta-pill">{property.bedrooms || 0} Bedrooms</span>
+                    <span className="meta-pill">{property.bathrooms || 0} Bathrooms</span>
+                    <span className="meta-pill">{property.area || 'Area'}</span>
+                  </div>
+                  <div className="card-actions home-card-action">
+                    <Button type="default" onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
+                    <Button type="primary" onClick={() => handleContactProperty(property, 'sale')}>Buy Now</Button>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
+      </section>
+
+      {renderCategoryShowcase('Houses', houseProperties, '#d97706')}
+      {renderCategoryShowcase('Apartments', apartmentProperties, '#0ea5e9')}
+      {renderCategoryShowcase('Flats', flatProperties, '#14b8a6', 'FOR RENT')}
 
       <WhyChooseRMS />
       <HowItWorks />
@@ -204,7 +275,7 @@ function HomePage() {
           <Row gutter={[16,16]} style={{ marginTop: 8 }}>
             {properties.filter(p => p.transactionType === 'Rent').slice(0,4).map((property) => (
               <Col xs={24} md={12} lg={6} key={property.id}>
-                <Card cover={<img alt={property.title} src={property.image} />} className="property-card">
+                <Card cover={<img alt={property.title} src={getPrimaryImage(property) || FALLBACK_IMAGE} style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />} className="property-card">
                   <div className="card-body">
                     <div className="card-top-row">
                       <Tag color="cyan">FOR RENT</Tag>

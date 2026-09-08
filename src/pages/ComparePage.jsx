@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Row, Col, Card, Button, Table } from 'antd';
 import { useProperties } from '../contexts/PropertyContext';
 import CompareSaveModal from '../components/CompareSaveModal';
+import { getPrimaryImage, FALLBACK_IMAGE } from '../utils/imageUtils';
 import { toast } from 'react-toastify';
 
 function ComparePage() {
@@ -40,7 +41,7 @@ function ComparePage() {
         <Row gutter={[12,12]}>
           {selected.map((p) => (
             <Col key={p.id} xs={24} md={8}>
-              <Card cover={<img alt={p.title} src={p.image} style={{ height: 160, objectFit: 'cover' }} />}>
+              <Card cover={<img alt={p.title} src={getPrimaryImage(p) || FALLBACK_IMAGE} style={{ height: 160, objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />}>
                 <h3>{p.title}</h3>
                 <div>{p.address}</div>
                 <div style={{ marginTop: 8 }}><strong>{p.price}</strong></div>

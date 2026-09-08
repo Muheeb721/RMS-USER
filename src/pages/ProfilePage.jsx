@@ -18,6 +18,7 @@ import FavoriteToggle from "../components/FavoriteToggle";
 import { sanitizeFullName } from "../utils/nameValidation";
 import api from "../services/api";
 import "./ProfilePage.css";
+import { FALLBACK_IMAGE } from '../utils/imageUtils';
 
 const defaultProfile = {
   name: "Muheeb ullah",
@@ -201,9 +202,9 @@ function ProfilePage() {
             <div className="profile-avatar-upload">
               <div className="profile-avatar" onClick={triggerFileChoose} role="button" tabIndex={0}>
                 {editing && draft.image ? (
-                  <img src={draft.image} alt="Profile preview" />
+                  <img src={draft.image} alt="Profile preview" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: '50%' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
                 ) : profile.image ? (
-                  <img src={profile.image} alt="Profile" />
+                  <img src={profile.image} alt="Profile" style={{ width: 120, height: 120, objectFit: 'cover', borderRadius: '50%' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
                 ) : (
                   initials
                 )}

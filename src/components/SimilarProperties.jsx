@@ -1,6 +1,7 @@
 import { Row, Col, Card, Tag, Button } from 'antd';
 import { EnvironmentOutlined } from '@ant-design/icons';
 import { useProperties } from '../contexts/PropertyContext';
+import { getPrimaryImage, FALLBACK_IMAGE } from '../utils/imageUtils';
 
 function SimilarProperties({ property, limit = 4 }) {
   const { properties } = useProperties();
@@ -33,7 +34,7 @@ function SimilarProperties({ property, limit = 4 }) {
       <Row gutter={[12, 12]}>
         {sorted.map((p) => (
           <Col key={p.id} xs={24} sm={12} md={6}>
-            <Card size="small" cover={<img alt={p.title} src={p.image} style={{ height: 120, objectFit: 'cover' }} />}>
+            <Card size="small" cover={<img alt={p.title} src={getPrimaryImage(p) || FALLBACK_IMAGE} style={{ height: 120, objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />}>
               <div style={{ fontWeight: 700 }}>{p.title}</div>
               <div style={{ color: '#64809b', display: 'flex', alignItems: 'center', gap: 6 }}><EnvironmentOutlined /> {p.address}</div>
               <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>

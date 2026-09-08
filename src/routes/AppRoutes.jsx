@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import ProtectedRoute from './ProtectedRoute';
 import AdminRoute from './AdminRoute';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const HomePage = lazy(() => import('../pages/HomePage'));
 const AboutPage = lazy(() => import('../pages/AboutPage'));
@@ -38,9 +39,7 @@ const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const SettingsPage = lazy(() => import('../pages/SettingsPage'));
 const DemoLandingPage = lazy(() => import('../pages/DemoLandingPage'));
 const HouseDemoPage = lazy(() => import('../pages/HouseDemoPage'));
-const HostelDemoPage = lazy(() => import('../pages/HostelDemoPage'));
 const FlatsDemoPage = lazy(() => import('../pages/FlatsDemoPage'));
-const RoomsDemoPage = lazy(() => import('../pages/RoomsDemoPage'));
 const ApartmentsDemoPage = lazy(() => import('../pages/ApartmentsDemoPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
@@ -60,9 +59,7 @@ function AppRoutes() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/demo" element={<DemoLandingPage />} />
           <Route path="/demo/house" element={<HouseDemoPage />} />
-          <Route path="/demo/hostel" element={<HostelDemoPage />} />
           <Route path="/demo/flats" element={<FlatsDemoPage />} />
-          <Route path="/demo/rooms" element={<RoomsDemoPage />} />
           <Route path="/demo/apartments" element={<ApartmentsDemoPage />} />
           <Route path="/pricing" element={<Navigate to="/demo" replace />} />
           <Route path="/contact" element={<ContactPage />} />
@@ -83,7 +80,7 @@ function AppRoutes() {
         </Route>
 
         <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<UserDashboardPage />} />
+            <Route path="/dashboard" element={<ErrorBoundary><UserDashboardPage /></ErrorBoundary>} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/rent-management" element={<RentManagementPage />} />
           <Route path="/settings" element={<SettingsPage />} />
@@ -91,7 +88,7 @@ function AppRoutes() {
         </Route>
 
         <Route element={<AdminRoute />}>
-          <Route path="/admin" element={<AdminDashboardPage />} />
+            <Route path="/admin" element={<ErrorBoundary><AdminDashboardPage /></ErrorBoundary>} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
           <Route path="/admin/rent" element={<AdminRentPage />} />
           <Route path="/admin/notifications" element={<NotificationsErrorBoundary><NotificationsPage /></NotificationsErrorBoundary>} />

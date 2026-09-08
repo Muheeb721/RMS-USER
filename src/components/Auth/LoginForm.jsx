@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { login, addNotification } from '../../redux/store';
 import { createLoginNotification, saveSessionUser } from '../../services/notificationService.jsx';
+import { addStoredNotification } from '../../utils/notificationsStorage.jsx';
 import { sanitizeFullName, fullNameRule } from '../../utils/nameValidation.jsx';
 
 function LoginForm() {
@@ -28,7 +29,10 @@ function LoginForm() {
     });
 
     dispatch(login(user));
-    dispatch(addNotification(createLoginNotification(user)));
+    const note = createLoginNotification(user);
+    dispatch(addNotification(note));
+    // persist notification to backend when possible
+    try { addStoredNotification(note); } catch (e) { /* ignore */ }
     form.resetFields();
     setLoading(false);
     toast.success(`Welcome back, ${user.name}!`);

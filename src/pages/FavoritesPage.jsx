@@ -6,6 +6,7 @@ import { useProperties } from '../contexts/PropertyContext';
 import { hostelData } from '../data/dummyData';
 import FavoriteToggle from '../components/FavoriteToggle';
 import './FavoritesPage.css';
+import { FALLBACK_IMAGE, getPrimaryImage } from '../utils/imageUtils';
 
 function FavoritesPage() {
   const { favorites } = useSelector((state) => state.auth || {});
@@ -46,7 +47,7 @@ function FavoritesPage() {
               <Card
                 key={property.id}
                 className="favorite-card card-hover"
-                cover={<img alt={property.title} src={property.image} />}
+                cover={<img alt={property.title} src={getPrimaryImage(property) || FALLBACK_IMAGE} style={{ width: '100%', height: 200, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />}
               >
                 <div className="card-body">
                   <div className="card-top-row">

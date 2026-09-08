@@ -56,13 +56,30 @@ export const deleteNotification = async (id) => {
 
 // Deprecated localStorage helpers (kept for compatibility but not source of truth)
 // Deprecated localStorage helpers removed. Use API-backed notification methods in ../services/notificationService.jsx
-export const readStoredNotifications = () => {
-  console.warn('readStoredNotifications() removed: use fetchNotifications() from services/notificationService.jsx');
-  return [];
+export const readStoredNotifications = (fallback = []) => {
+  try {
+    const raw = window.localStorage.getItem('rms_notifications');
+    if (!raw) {
+      // persist the provided fallback so UI remains consistent across reloads
+      try {
+        window.localStorage.setItem('rms_notifications', JSON.stringify(fallback));
+      } catch (e) {}
+      return Array.isArray(fallback) ? fallback : [];
+    }
+    const parsed = JSON.parse(raw || '[]');
+    return Array.isArray(parsed) ? parsed : Array.isArray(fallback) ? fallback : [];
+  } catch (e) {
+    console.warn('readStoredNotifications failed, returning fallback', e);
+    return Array.isArray(fallback) ? fallback : [];
+  }
 };
 
-export const saveStoredNotifications = () => {
-  console.warn('saveStoredNotifications() removed: persist notifications via backend APIs');
+export const saveStoredNotifications = (items = []) => {
+  try {
+    window.localStorage.setItem('rms_notifications', JSON.stringify(Array.isArray(items) ? items : []));
+  } catch (e) {
+    console.warn('saveStoredNotifications failed', e);
+  }
 };
 
 export const addStoredNotification = async (note) => {

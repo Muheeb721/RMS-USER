@@ -3,6 +3,7 @@ import { BellOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { toast } from 'react-toastify';
 import NotificationDrawer from './NotificationDrawer';
 import { markAllNotificationsAsRead, markNotificationAsRead, removeNotification, setNotifications } from '../../redux/store';
 import { markNotificationAsReadOnServer } from '../../services/notificationService.jsx';
@@ -27,13 +28,24 @@ function NotificationBell() {
       return;
     }
 
-    // Navigate to notifications page and open the drawer
+    if (!session?.email) {
+      toast.info('Open notifications is available. Please log in to sync your personal alerts.');
+      navigate('/notifications');
+      return;
+    }
+
     setIsOpen(true);
     if (session?.role === 'admin') navigate('/admin/notifications');
     else navigate('/notifications');
   };
 
   useEffect(() => {
+    const session = readSessionUser();
+    if (!session?.email) {
+      setServerUnread(0);
+      return undefined;
+    }
+
     let mounted = true;
     (async () => {
       try {
@@ -45,7 +57,7 @@ function NotificationBell() {
     })();
 
     return () => { mounted = false; };
-  }, []);
+  }, [location.pathname]);
 
   const handleMarkRead = (id) => {
     (async () => {

@@ -4,6 +4,7 @@ import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
 import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
+import { getPrimaryImage } from '../utils/imageUtils';
 
 const emptyForm = {
   title: '',
@@ -26,7 +27,7 @@ function RoomsDemoPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const roomProperties = useMemo(() => properties.filter((p) => p.type === 'Room'), [properties]);
+  const roomProperties = useMemo(() => properties.filter((p) => String(p.type || '').toLowerCase() === 'room'), [properties]);
 
   const filteredProperties = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -141,7 +142,7 @@ function RoomsDemoPage() {
           <div className="listing-grid">
             {filteredProperties.map((property) => (
               <article className="property-card compact" key={property.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${property.image})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${getPrimaryImage(property)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{property.type}</span>

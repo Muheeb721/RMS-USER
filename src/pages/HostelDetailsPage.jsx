@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { hostelData } from "../data/dummyData";
 import "./HostelDetailsPage.css";
 import ActionModal from "../components/ActionModal";
+import { getPrimaryImage, FALLBACK_IMAGE } from '../utils/imageUtils';
 import { toast } from "react-toastify";
 
 function HostelDetailsPage() {
@@ -19,12 +20,13 @@ function HostelDetailsPage() {
       <section className="section-card">
         <Row gutter={[24, 24]}>
           <Col xs={24} lg={14}>
-            <Card
+              <Card
               cover={
                 <img
                   alt={hostel.title}
-                  src={hostel.image}
-                  style={{ height: 360, objectFit: "cover" }}
+                  src={getPrimaryImage(hostel) || FALLBACK_IMAGE}
+                  style={{ width: '100%', height: 360, objectFit: "cover", borderRadius: 8 }}
+                  onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
                 />
               }
             >

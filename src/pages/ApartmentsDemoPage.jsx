@@ -4,6 +4,7 @@ import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
 import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
+import { getPrimaryImage } from '../utils/imageUtils';
 
 const emptyForm = {
   title: '',
@@ -26,7 +27,7 @@ function ApartmentsDemoPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const aptProperties = useMemo(() => properties.filter((p) => p.type === 'Apartment'), [properties]);
+  const aptProperties = useMemo(() => properties.filter((p) => String(p.type || '').toLowerCase() === 'apartment'), [properties]);
 
   const filteredProperties = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -133,15 +134,15 @@ function ApartmentsDemoPage() {
             <h2>Apartment management console</h2>
             <p>Create a new apartment listing or update an existing one instantly.</p>
           </div>
-          <span className="section-count">{aptProperties.length} apartment records</span>
+          <span className="section-count">{Math.min(aptProperties.length, 10)} apartment records</span>
         </div>
 
         <div className="management-preview user-facing">
           <h3>Apartment listings</h3>
           <div className="listing-grid">
-            {filteredProperties.map((property) => (
+            {filteredProperties.slice(0, 10).map((property) => (
               <article className="property-card compact" key={property.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${property.image})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${getPrimaryImage(property)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{property.type}</span>
@@ -150,7 +151,7 @@ function ApartmentsDemoPage() {
                   <h3>{property.title}</h3>
                   <p className="location">📍 {property.address || property.location}</p>
                   <div className="card-footer">
-                    <p className="price">{property.price}</p>
+                    <p className="price" style={{ visibility: 'hidden' }}>—</p>
                     <div className="card-actions">
                       <button type="button" className="secondary-button" onClick={() => handleViewProperty(property)}>View</button>
                       <button type="button" className="details-button" onClick={() => handleReserveProperty(property)}>Reserve</button>

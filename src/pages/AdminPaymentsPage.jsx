@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Tag, Modal, Form, Input, Select, DatePicker } from 'antd';
-import { getPayments, updatePayment, deletePayment } from '../services/paymentsService.jsx';
+import { getPayments, getPaymentsFallback, updatePayment, deletePayment } from '../services/paymentsService.jsx';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { recordAdminAction } from '../services/adminActivityService.jsx';
@@ -20,8 +20,27 @@ function AdminPaymentsPage() {
   const [form] = Form.useForm();
 
   useEffect(() => {
-    setPayments(getPayments());
-    const onUpdate = () => setPayments(getPayments());
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await getPayments();
+        if (mounted) {
+          if (Array.isArray(res) && res.length) {
+            setPayments(res);
+          } else {
+            const fallback = typeof getPaymentsFallback === 'function' ? getPaymentsFallback() : [];
+            setPayments(fallback || []);
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          const fallback = typeof getPaymentsFallback === 'function' ? getPaymentsFallback() : [];
+          setPayments(fallback || []);
+        }
+      }
+    };
+    load();
+    const onUpdate = () => { load(); };
     window.addEventListener('rms-payments-updated', onUpdate);
     return () => window.removeEventListener('rms-payments-updated', onUpdate);
   }, []);

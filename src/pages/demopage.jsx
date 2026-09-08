@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
+import { getPrimaryImage } from '../utils/imageUtils';
 
 const categories = ['All', 'House', 'Apartment', 'Hostel', 'Room', 'Commercial'];
 
@@ -30,7 +31,7 @@ function DemoPage() {
     const term = searchTerm.toLowerCase();
 
     return properties.filter((property) => {
-      const matchesCategory = activeCategory === 'All' || property.type === activeCategory;
+      const matchesCategory = activeCategory === 'All' || String(property.type || '').toLowerCase() === String(activeCategory || '').toLowerCase();
       const matchesSearch =
         !term ||
         property.title?.toLowerCase().includes(term) ||
@@ -152,7 +153,7 @@ function DemoPage() {
             <h3>Live listings</h3>
             {filteredProperties.map((property) => (
               <article className="property-card compact" key={property.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${property.image})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${getPrimaryImage(property)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{property.type}</span>

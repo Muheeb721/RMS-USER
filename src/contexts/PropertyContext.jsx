@@ -21,13 +21,16 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
         ? [item.image]
         : [FALLBACK_IMAGE];
 
+  const videos = Array.isArray(item.videos) && item.videos.length ? item.videos : (item.video ? [item.video] : []);
+  const media3d = Array.isArray(item.media3d) && item.media3d.length ? item.media3d : (item.model3d ? [item.model3d] : []);
+
   const image = item.image || images[0] || FALLBACK_IMAGE;
 
   const rawStatus = item.status || item.availability || item.availabilityStatus || 'Available';
   const normalizedStatus = String(rawStatus).trim();
 
   return {
-    id: item.id ?? fallbackId,
+    id: item._id || item.id || fallbackId,
     source: 'property',
     title: item.title || item.name || "Untitled Property",
     description: item.description || "Premium property managed through RMS.",
@@ -54,6 +57,8 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
     owner: item.owner || "RMS Admin",
     image,
     images,
+    videos,
+    media3d,
     lat: item.lat ?? 31.5204,
     lng: item.lng ?? 74.3587,
     category: item.category || "Featured",

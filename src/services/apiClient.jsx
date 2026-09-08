@@ -12,7 +12,17 @@ apiClient.interceptors.request.use(
     // If you store a non-HttpOnly token in memory, attach it here.
     // Prefer HttpOnly secure cookies so the browser sends them automatically.
     const token = window.__RMS_AUTH_TOKEN || null;
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Development helper: attach local session from localStorage so backend can authenticate in dev/e2e
+      try {
+        const sess = window.localStorage.getItem('rms_auth_session');
+        if (sess) config.headers['x-rms-session'] = sess;
+      } catch (e) {
+        // ignore
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)

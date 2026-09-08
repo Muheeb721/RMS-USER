@@ -4,6 +4,7 @@ import { useProperties } from '../contexts/PropertyContext';
 import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
 import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
+import { getPrimaryImage } from '../utils/imageUtils';
 
 const categories = ['All', 'House', 'Apartment', 'Room', 'Commercial'];
 
@@ -29,14 +30,7 @@ function HouseDemoPage() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const houseProperties = useMemo(
-    () => properties.filter((property) => property.type === 'House'),
-    ()=>  properties.filter((property) => property.type === 'flat'),
-    ()=>  properties.filter((property) => property.type === 'room'),
-    
-
-    [properties]
-  );
+  const houseProperties = useMemo(() => properties.filter((property) => String(property.type || '').toLowerCase() === 'house'), [properties]);
 
   const filteredProperties = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -165,7 +159,7 @@ function HouseDemoPage() {
             <h2>House management console</h2>
             <p>Create a new house listing or update an existing one instantly.</p>
           </div>
-          <span className="section-count">{houseProperties.length} house records</span>
+          <span className="section-count">{Math.min(houseProperties.length, 10)} house records</span>
         </div>
 
         <div className="management-layout">
@@ -250,9 +244,9 @@ function HouseDemoPage() {
 
           <div className="management-preview">
             <h3>Live house listings</h3>
-            {filteredProperties.map((property) => (
+            {filteredProperties.slice(0, 10).map((property) => (
               <article className="property-card compact" key={property.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${property.image})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${getPrimaryImage(property)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{property.type}</span>
@@ -263,7 +257,7 @@ function HouseDemoPage() {
                   <h3>{property.title}</h3>
                   <p className="location">📍 {property.address || property.location}</p>
                   <div className="card-footer">
-                    <p className="price">{property.price}</p>
+                    <p className="price" style={{ visibility: 'hidden' }}>—</p>
                     <div className="card-actions">
                       <button type="button" className="secondary-button" onClick={() => handleViewProperty(property)}>
                         View
@@ -286,7 +280,7 @@ function HouseDemoPage() {
           <p>House Portfolio Management</p>
           <h2>Keep your house listings organized, searchable, and ready for buyers and tenants.</h2>
         </div>
-        <Link to="/demo/hostel" className="cta-button1">Open Hostel View</Link>
+        <Link to="/demo/apartments" className="cta-button1">Open Apartment View</Link>
       </section>
     </div>
   );

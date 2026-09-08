@@ -6,6 +6,7 @@ import {
   removeDashboardSubmission,
 } from "../utils/dashboardSubmissionStorage.jsx";
 import { readStoredNotifications } from '../utils/notificationsStorage.jsx';
+import api from '../services/api';
 import "./UserDashboardPage.css";
 import { read as readInquiries } from '../utils/propertyInquiriesStorage';
 import { read as readVisits } from '../utils/propertyVisitsStorage';
@@ -42,14 +43,13 @@ function UserDashboardPage() {
       setError(null);
       try {
         // submissions from backend
-        const api = await import('../services/api');
         const subsRes = await api.request('/contact?type=Dashboard');
-        const subs = subsRes?.data || subsRes?.data === undefined ? (subsRes?.data || subsRes?.data === undefined ? subsRes : subsRes) : [];
+        const subs = subsRes?.data ?? subsRes ?? [];
         // inquiries, visits and saved searches via utils/services
         const [inq, v, saved] = await Promise.all([readInquiries(), readVisits(), readSavedSearches()]);
         const notifications = [];
         if (!mounted) return;
-        setSubmissions(Array.isArray(subs) ? subs : (subsRes?.data || []));
+        setSubmissions(Array.isArray(subs) ? subs : []);
         setInquiries(inq || []);
         setVisits(v || []);
         setSavedSearches(saved || []);
