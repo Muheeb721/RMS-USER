@@ -129,6 +129,9 @@ import apiClient from './apiClient';
 
 export const fetchNotificationsFromServer = async () => {
   try {
+    if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) {
+      console.log('Notifications API called');
+    }
     const response = await apiClient.get('/notifications');
     const json = response.data || { data: [] };
     const items = Array.isArray(json.data) ? json.data : [];

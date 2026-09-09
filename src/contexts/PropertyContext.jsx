@@ -13,18 +13,134 @@ const STORAGE_KEY = "rms_properties";
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80";
 
-const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
-  const images =
-    Array.isArray(item.images) && item.images.length
-      ? item.images
-      : item.image
-        ? [item.image]
-        : [FALLBACK_IMAGE];
+const isBlockedRemoteImage = (src = '') => {
+  if (!src || typeof src !== 'string') return true;
+  if (src.startsWith('data:image/')) return false;
+  if (src.startsWith('/')) return false;
+  if (src.startsWith('http://') || src.startsWith('https://')) return false;
+  return false;
+};
+
+const buildGeneratedPropertyArt = (type = 'Property', title = 'Property', index = 0) => {
+  const safeType = String(type || 'Property').trim() || 'Property';
+  const safeTitle = String(title || safeType).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const palette = {
+    house: ['#1f7a8c', '#6bbf59', '#f5d76e', '#e76f51'],
+    apartment: ['#2d6cdf', '#48bfe3', '#90e0ef', '#0a2342'],
+    flat: ['#5c6ac4', '#8ecae6', '#b8f2e6', '#ffb703'],
+    room: ['#7f5539', '#d8b4a0', '#f4d35e', '#2a9d8f'],
+    hostel: ['#73a9ad', '#b5d99c', '#f6bd60', '#5f4b8b'],
+  };
+  const colors = palette[String(safeType).toLowerCase()] || ['#0b5d8c', '#11a8ab', '#f4d35e', '#fe7f2d'];
+  const bg = colors[(index + safeTitle.length) % colors.length];
+  const accent = colors[(index + 2) % colors.length];
+  const accent2 = colors[(index + 3) % colors.length];
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+      <defs>
+        <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="${bg}"/>
+          <stop offset="100%" stop-color="${accent}"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="800" fill="url(#bg)"/>
+      <circle cx="980" cy="120" r="150" fill="${accent2}" opacity="0.2"/>
+      <rect x="180" y="260" width="840" height="360" rx="30" fill="rgba(255,255,255,0.16)" stroke="rgba(255,255,255,0.35)"/>
+      <path d="M180 260 L600 120 L1020 260" fill="none" stroke="${accent2}" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+      <rect x="250" y="330" width="220" height="150" rx="18" fill="rgba(255,255,255,0.12)"/>
+      <rect x="500" y="330" width="180" height="150" rx="18" fill="rgba(255,255,255,0.1)"/>
+      <rect x="710" y="330" width="200" height="150" rx="18" fill="rgba(255,255,255,0.14)"/>
+      <rect x="320" y="540" width="560" height="54" rx="16" fill="rgba(7,23,33,0.14)"/>
+      <text x="600" y="610" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="54" font-weight="700" fill="#ffffff">${safeType}</text>
+      <text x="600" y="668" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="rgba(255,255,255,0.9)" font-weight="600">${safeTitle.slice(0, 28)}</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
+const normalizeGeneratedImage = (value, type = 'Property', title = 'Property', index = 0) => {
+  if (!value || typeof value !== 'string') return buildGeneratedPropertyArt(type, title, index);
+  if (value.startsWith('data:image/')) return value;
+  if (isBlockedRemoteImage(value)) return buildGeneratedPropertyArt(type, title, index);
+  return value;
+};
+
+const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new Set()) => {
+  const imagesRaw = Array.isArray(item.images) && item.images.length ? item.images : item.image ? [item.image] : [];
+
+  // Generate unique, type-appropriate image arrays when none are provided.
+  // Prefer local curated images placed under `/public/images/{category}/` using the
+  // naming convention: `{propertyId}-1.jpg`, `{propertyId}-2.jpg`, ...
+  // If local assets are not present at runtime, the browser will fallback via img onError.
+  // We also append Unsplash fallbacks so the UI remains populated during initial setup.
+  const generateImagesFor = (type, id, count = 6) => {
+    const normalized = String(type || 'property').trim().toLowerCase();
+    const folder = normalized.includes('house') ? 'houses'
+      : normalized.includes('apartment') ? 'apartments'
+      : normalized.includes('flat') ? 'flats'
+      : normalized.includes('hostel') ? 'hostels'
+      : normalized.includes('room') ? 'rooms'
+      : 'properties';
+
+    const results = [];
+
+    // Local naming convention: /images/{folder}/{id}-{index}.jpg
+    for (let i = 1; i <= count; i++) {
+      results.push(`/images/${folder}/${id}-${i}.jpg`);
+    }
+
+    // Also add a few unsplash fallbacks (kept as last-resort fallback)
+    const keyword = normalized || 'property';
+    for (let i = 0; i < 3; i++) {
+      const sig = encodeURIComponent(`${id}-fallback-${i}`);
+      results.push(`https://source.unsplash.com/1200x800/?${keyword}&sig=${sig}`);
+    }
+
+    return results;
+  };
+
+  // decide how many images are desirable per type
+  const desiredCountMap = {
+    House: 8,
+    Apartment: 6,
+    Flat: 6,
+    Hostel: 6,
+    Room: 5,
+  };
+
+  const effectiveType = item.type || item.propertyType || item.category || 'Property';
+  const desiredCount = desiredCountMap[effectiveType] || 6;
+
+  // start with any provided images (or single image) then fill with generated, type-appropriate images
+  const fillers = generateImagesFor(effectiveType, fallbackId, desiredCount);
+  const merged = [];
+  // add provided images first (if any) but skip any already used as a cover for another property
+  for (const src of imagesRaw) {
+    if (!src) continue;
+    if (usedImages && usedImages.has(src)) {
+      // skip provided src to avoid duplicate cover images across properties
+      continue;
+    }
+    if (!merged.includes(src)) merged.push(src);
+  }
+  // append fillers until we reach desiredCount
+  for (let i = 0; merged.length < desiredCount && i < fillers.length; i++) {
+    if (!merged.includes(fillers[i])) merged.push(fillers[i]);
+  }
+  // ensure at least one fallback image
+  if (!merged.length) merged.push(FALLBACK_IMAGE);
+
+  const images = merged.map((src) => normalizeGeneratedImage(src, effectiveType, item.title || 'Property', fallbackId));
 
   const videos = Array.isArray(item.videos) && item.videos.length ? item.videos : (item.video ? [item.video] : []);
   const media3d = Array.isArray(item.media3d) && item.media3d.length ? item.media3d : (item.model3d ? [item.model3d] : []);
 
-  const image = item.image || images[0] || FALLBACK_IMAGE;
+  // pick cover image; prefer provided item.image if it wasn't skipped
+  let image = item.image && !usedImages?.has(item.image) && !isBlockedRemoteImage(item.image)
+    ? normalizeGeneratedImage(item.image, effectiveType, item.title || 'Property', fallbackId)
+    : images[0] || buildGeneratedPropertyArt(effectiveType, item.title || 'Property', fallbackId);
+  // mark the chosen cover as used to prevent reuse across properties
+  try { if (usedImages && image) usedImages.add(image); } catch (e) {}
 
   const rawStatus = item.status || item.availability || item.availabilityStatus || 'Available';
   const normalizedStatus = String(rawStatus).trim();
@@ -72,7 +188,8 @@ const normalizeProperty = (item = {}, fallbackId = Date.now()) => {
 
 const getInitialProperties = () => {
   // start with local fallback so UI remains functional until API responds
-  return initialPropertyData.map((item, index) => normalizeProperty(item, index + 1));
+  const usedImages = new Set();
+  return initialPropertyData.map((item, index) => normalizeProperty(item, index + 1, usedImages));
 };
 
 const decodeTokenPayload = () => {
@@ -106,7 +223,8 @@ export function PropertyProvider({ children }) {
       try {
         const res = await propertyService.listProperties();
         if (mounted && res && res.success && Array.isArray(res.data)) {
-          setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1)));
+          const usedImages = new Set();
+          setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1, usedImages)));
         }
       } catch (e) {
         // keep fallback local data
@@ -124,9 +242,11 @@ export function PropertyProvider({ children }) {
           return null;
         }
 
+        const usedImages = new Set((properties || []).map((p) => p.image).filter(Boolean));
         const nextProperty = normalizeProperty(
           { ...property, id: property.id || Date.now() },
           Date.now(),
+          usedImages,
         );
         // attempt to create on server
         try {

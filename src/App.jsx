@@ -7,10 +7,10 @@ import 'antd/dist/reset.css';
 import { store } from './redux/store';
 import AppRoutes from './routes/AppRoutes';
 import { useEffect } from 'react';
-import { fetchNotificationsFromServer, saveSessionUser } from './services/notificationService.jsx';
+import { saveSessionUser } from './services/notificationService.jsx';
 import { login } from './redux/store';
 import favoriteService from './services/favoriteService';
-import { setNotifications, setFavorites } from './redux/store';
+import { setFavorites } from './redux/store';
 import { PropertyProvider } from './contexts/PropertyContext';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -38,14 +38,6 @@ function App() {
       if (!token) return;
 
       (async () => {
-        try {
-          const res = await fetchNotificationsFromServer();
-          if (res && res.success && Array.isArray(res.data)) {
-            dispatch(setNotifications(res.data));
-          }
-        } catch (e) {
-          console.warn('Notification fetch failed on app init', e);
-        }
         try {
           const favRes = await favoriteService.listFavorites();
           if (favRes && favRes.success && Array.isArray(favRes.data)) {

@@ -119,6 +119,10 @@ function ContactPage() {
     const params = new URLSearchParams(location.search);
     const propertyTitle = params.get("propertyTitle");
     const propertyType = params.get("propertyType");
+    const inquiryType = params.get("inquiryType");
+    if (inquiryType) {
+      setFormData((prev) => ({ ...prev, inquiryType: decodeURIComponent(inquiryType) }));
+    }
     if (propertyTitle) {
       setFormData((prev) => ({
         ...prev,
@@ -209,6 +213,35 @@ function ContactPage() {
       });
     } catch (apiError) {
       console.error('Contact API submission failed', apiError);
+    }
+
+    // If this inquiry is a purchase/buy action and a property is selected, create a booking record
+    try {
+      const isPurchase = (formData.inquiryType || '').toLowerCase().includes('buy') || (formData.inquiryType || '').toLowerCase().includes('sale') || (payload.propertyType || '').toLowerCase().includes('sale');
+      if (selectedProperty && isPurchase) {
+        try {
+          const bookingService = (await import('../services/bookingService.jsx')).default || (await import('../services/bookingService.js'));
+          const bookingPayload = {
+            userName: formData.fullName,
+            userEmail: formData.email,
+            userPhone: formData.phone,
+            propertyId: selectedProperty?.id || selectedProperty?._id || '',
+            propertyTitle: selectedProperty?.title || selectedProperty?.name || payload.propertyName,
+            propertyType: selectedProperty?.type || payload.propertyType,
+            amount: Number(selectedProperty?.price || selectedProperty?.amount || 0),
+            rent: Number(selectedProperty?.rent || selectedProperty?.price || 0),
+            rentFrequency: 'One-time',
+            message: payload.message,
+            bookingStatus: 'Pending',
+            paymentStatus: 'Pending',
+          };
+          await bookingService.createBooking ? bookingService.createBooking(bookingPayload) : bookingService(bookingPayload);
+        } catch (e) {
+          console.warn('Create booking for purchase inquiry failed', e);
+        }
+      }
+    } catch (e) {
+      console.warn('Purchase booking branch failed', e);
     }
 
     dispatch(

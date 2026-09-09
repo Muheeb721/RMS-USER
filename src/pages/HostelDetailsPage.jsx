@@ -7,6 +7,8 @@ import ActionModal from "../components/ActionModal";
 import { getPrimaryImage, FALLBACK_IMAGE } from '../utils/imageUtils';
 import { toast } from "react-toastify";
 
+const hostelBanner = (hostel) => getPrimaryImage(hostel, Number(hostel?.id || 0), 'demo') || FALLBACK_IMAGE;
+
 function HostelDetailsPage() {
   const { id } = useParams();
   const hostel = hostelData.find((item) => item.id === Number(id));
@@ -24,7 +26,7 @@ function HostelDetailsPage() {
               cover={
                 <img
                   alt={hostel.title}
-                  src={getPrimaryImage(hostel) || FALLBACK_IMAGE}
+                  src={hostelBanner(hostel)}
                   style={{ width: '100%', height: 360, objectFit: "cover", borderRadius: 8 }}
                   onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
                 />

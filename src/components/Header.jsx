@@ -1,88 +1,33 @@
-import { Layout, Dropdown } from "antd";
+import { Layout } from "antd";
 import {
   HomeOutlined,
   InfoCircleOutlined,
   CompassOutlined,
-  DollarCircleOutlined,
   PhoneOutlined,
+  AppstoreOutlined,
+  UserOutlined,
   DashboardOutlined,
 } from "@ant-design/icons";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { toggleTheme } from "../redux/store";
+import { useSelector } from "react-redux";
 import NotificationBell from "./Notifications/NotificationBell";
 import "../pages/header.css";
 
 const { Header } = Layout;
 
 function HeaderNav() {
-  const dispatch = useDispatch();
-  const { theme } = useSelector((state) => state.auth);
+  const { theme, user } = useSelector((state) => state.auth);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const navigate = useNavigate();
-
-  const handleLoginNavigation = (event) => {
-    if (event && typeof event.preventDefault === 'function') event.preventDefault();
-    try {
-      navigate('/login');
-    } catch (e) {
-      // fallback to full navigation
-      window.location.href = '/login';
-    }
-  };
-
-  const demoMenuItems = [
-    { key: "demo-overview", label: <Link to="/demo">Demo</Link> },
-    { key: "demo-house", label: <Link to="/demo/house">Demo House</Link> },
-    { key: "demo-flat", label: <Link to="/demo/flats">Demo Flat / Apartment</Link> },
-    { key: "demo-hostel", label: <Link to="/demo/hostel">Demo Hostel</Link> },
-    { key: "demo-rooms", label: <Link to="/demo/rooms">Demo Rooms</Link> },
-    { key: "demo-apartments", label: <Link to="/demo/apartments">Demo Apartments</Link> },
-  ];
+  const isLoggedIn = Boolean(user?.isLoggedIn || user?.email);
 
   const navItems = [
     { to: "/", label: "Home", icon: <HomeOutlined /> },
     { to: "/about", label: "About", icon: <InfoCircleOutlined /> },
-    { to: "/services", label: "Services", icon: <DashboardOutlined /> },
-    { to: "/demo", label: "Demo", special: "dropdown" },
-    { to: "/contact", label: "Contact", icon: <PhoneOutlined /> },
+    { to: "/services", label: "Services", icon: <AppstoreOutlined /> },
     { to: "/properties", label: "Properties", icon: <CompassOutlined /> },
-    { to: "/ai-recommendations", label: "AI Recommendations", icon: <DashboardOutlined /> },
-    { to: "/bookings", label: "Bookings", icon: <DollarCircleOutlined /> },
-    { to: "/maintenance", label: "Maintenance", icon: <DashboardOutlined /> },
-    { to: "/dashboard", label: "Dashboard", icon: <DashboardOutlined /> },
-    { to: "/payments", label: "Payments", icon: <DollarCircleOutlined /> },
+    { to: "/contact", label: "Contact", icon: <PhoneOutlined /> },
   ];
-
-  const renderNavItem = (item) => {
-    if (item.special === "dropdown") {
-      return (
-        <Dropdown
-          key={item.label}
-          menu={{ items: demoMenuItems }}
-          trigger={["click"]}
-          placement="bottomLeft"
-        >
-          <button type="button" className="top-nav-link dropdown-nav-button">
-            {item.label}
-          </button>
-        </Dropdown>
-      );
-    }
-
-    return (
-      <NavLink
-        key={item.to}
-        to={item.to}
-        className={({ isActive }) =>
-          isActive ? "top-nav-link active" : "top-nav-link"
-        }
-      >
-        {item.label}
-      </NavLink>
-    );
-  };
 
   return (
     <Header
@@ -95,60 +40,32 @@ function HeaderNav() {
         borderBottom: "1px solid rgba(231,235,242,0.9)",
       }}
     >
-      <div
-        style={{
-          maxWidth: 1280,
-          width: "100%",
-          margin: "0 auto",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 16,
-        }}
-      >
-        <Link
-          to="/"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            color: theme === "dark" ? "#fff" : "#0b2450",
-            fontWeight: 800,
-          }}
-        >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 14,
-              display: "grid",
-              placeItems: "center",
-              background: "linear-gradient(135deg, #0b2450 0%, #28b463 100%)",
-              color: "#fff",
-            }}
-          >
-            🏠
-          </div>
-          <div>
-            <div style={{ fontSize: 16, lineHeight: 1.1 }}>RMS</div>
-            <div
-              style={{
-                fontSize: 12,
-                color: theme === "dark" ? "#cbd5e1" : "#687386",
-                fontWeight: 600,
-              }}
-            >
-              Residential Management System
-            </div>
+      <div className="topbar-inner">
+        <Link to="/" className="brand-link" style={{ color: theme === "dark" ? "#fff" : "#0b2450" }}>
+          <div className="brand-mark">🏠</div>
+          <div className="brand-copy">
+            <div className="brand-name">RMS</div>
+            <div className="brand-tagline">Residential Management System</div>
           </div>
         </Link>
 
-        <nav className="topbar-nav">
-          {navItems.map(renderNavItem)}
+        <nav className="topbar-nav" aria-label="Main navigation">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                isActive ? "top-nav-link active" : "top-nav-link"
+              }
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
         </nav>
 
-        {/* Mobile hamburger button */}
         <button
+          type="button"
           className="hamburger"
           aria-label="Toggle menu"
           onClick={() => setIsMenuOpen((s) => !s)}
@@ -160,72 +77,58 @@ function HeaderNav() {
 
         <div className="topbar-actions">
           <NotificationBell />
-          <Link to="/dashboard" className="btn-primary" style={{ padding: '8px 12px', marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <DashboardOutlined /> Dashboard
-          </Link>
-          <Link to="/my-rent" className="btn-secondary" style={{ padding: '8px 12px', marginLeft: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <DollarCircleOutlined /> My Rent
-          </Link>
-          <button
-            type="button"
-            onClick={() => dispatch(toggleTheme())}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              color: theme === "dark" ? "#fff" : "#0b2450",
-              fontSize: 18,
-            }}
-          >
-          </button>
-          <Link to="/login" className="btn-secondary" style={{ padding: "8px 14px" }} onClick={handleLoginNavigation}>
-            Login
-          </Link>
+          {isLoggedIn ? (
+            <>
+              <Link to="/dashboard" className="btn-primary header-action-btn">
+                <DashboardOutlined />
+                <span>Dashboard</span>
+              </Link>
+              <Link to="/profile" className="btn-secondary header-action-btn">
+                <UserOutlined />
+                <span>{user?.name ? user.name.split(" ")[0] : "Profile"}</span>
+              </Link>
+            </>
+          ) : (
+            <Link to="/login" className="btn-primary header-action-btn">
+              <UserOutlined />
+              <span>Login</span>
+            </Link>
+          )}
         </div>
 
-        {/* Mobile fixed menu overlay (keeps header fixed) */}
         <div className={isMenuOpen ? "mobile-menu open" : "mobile-menu"}>
           <div className="mobile-menu-inner">
             <nav className="mobile-nav">
-              {navItems.map((item) => {
-                if (item.special === "dropdown") {
-                  return (
-                    <Dropdown
-                      key={item.label}
-                      menu={{ items: demoMenuItems }}
-                      trigger={["click"]}
-                      placement="bottomLeft"
-                    >
-                      <button
-                        type="button"
-                        className="top-nav-link dropdown-nav-button"
-                        onClick={() => setIsMenuOpen(false)}
-                      >
-                        {item.label}
-                      </button>
-                    </Dropdown>
-                  );
-                }
-
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    className={({ isActive }) =>
-                      isActive ? "top-nav-link active" : "top-nav-link"
-                    }
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    {item.label}
-                  </NavLink>
-                );
-              })}
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    isActive ? "top-nav-link active" : "top-nav-link"
+                  }
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
             </nav>
 
             <div className="mobile-actions">
-              <Link to="/login" className="btn-secondary" onClick={(e) => { setIsMenuOpen(false); handleLoginNavigation(e); }} style={{ padding: '8px 14px' }}>Login</Link>
-              <Link to="/signup" className="btn-secondary" onClick={() => setIsMenuOpen(false)} style={{ padding: '8px 14px' }}>Signup</Link>
-              {/* Get Started removed from mobile menu per request */}
+              {isLoggedIn ? (
+                <>
+                  <Link to="/dashboard" className="btn-primary" onClick={() => setIsMenuOpen(false)}>
+                    Dashboard
+                  </Link>
+                  <Link to="/profile" className="btn-secondary" onClick={() => setIsMenuOpen(false)}>
+                    Profile
+                  </Link>
+                </>
+              ) : (
+                <Link to="/login" className="btn-primary" onClick={() => setIsMenuOpen(false)}>
+                  Login
+                </Link>
+              )}
             </div>
           </div>
         </div>

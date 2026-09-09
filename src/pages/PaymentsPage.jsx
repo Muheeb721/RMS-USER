@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Table, Button, Modal, Form, Input, Select, DatePicker, Tag, Spin, Alert } from 'antd';
+import { Table, Button, Modal, Form, Input, Select, DatePicker, Tag, Spin, Alert, Row, Col, Card, Statistic } from 'antd';
 import { getPayments, createPayment } from '../services/paymentsService.jsx';
 import { useSelector, useDispatch } from 'react-redux';
 import { addNotification } from '../redux/store';
+import './PaymentsPage.css';
 
 const statusColor = (s) => {
   if (!s) return 'default';
@@ -79,23 +80,44 @@ function PaymentsPage() {
     { title: 'Status', dataIndex: 'status', key: 'status', render: (s) => <Tag color={statusColor(s)}>{s}</Tag> },
   ];
 
-  return (
-    <div className="page-shell">
-      <section className="section-card">
-        <h2 className="section-title">Payments</h2>
-        <p className="section-subtitle">Manage your payments and view payment history.</p>
+  const summary = payments.reduce((acc, item) => {
+    const total = Number(item.totalAmount || item.amountPaid || 0);
+    const paid = Number(item.amountPaid || 0);
+    const remaining = Number(item.remainingAmount || Math.max(total - paid, 0));
+    acc.totalRent += total;
+    acc.paid += paid;
+    acc.remaining += remaining;
+    return acc;
+  }, { totalRent: 0, paid: 0, remaining: 0 });
 
-        <div style={{ marginBottom: 12 }}>
+  return (
+    <div className="page-shell payments-page-shell">
+      <section className="section-card payments-shell">
+        <div className="payments-header">
+          <div>
+            <span className="eyebrow">Payment management</span>
+            <h2 className="section-title">Payments</h2>
+            <p className="section-subtitle">Track rent, partial payment balances, and your payment history.</p>
+          </div>
           <Button type="primary" onClick={() => setOpen(true)}>Make a Payment</Button>
         </div>
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
-        ) : error ? (
-          <Alert type="error" message={error} />
-        ) : (
-          <Table dataSource={payments} rowKey={(r) => r.id} columns={columns} pagination={{ pageSize: 8 }} />
-        )}
+        <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
+          <Col xs={24} md={6}><Card className="payment-stat-card"><Statistic title="Total Rent" value={summary.totalRent} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} /></Card></Col>
+          <Col xs={24} md={6}><Card className="payment-stat-card"><Statistic title="Paid Amount" value={summary.paid} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} /></Card></Col>
+          <Col xs={24} md={6}><Card className="payment-stat-card warning-card"><Statistic title="Remaining" value={summary.remaining} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} /></Card></Col>
+          <Col xs={24} md={6}><Card className="payment-stat-card success-card"><Statistic title="Status" value={summary.remaining > 0 ? 'Partial' : 'Current'} /></Card></Col>
+        </Row>
+
+        <div className="payment-table-wrap" style={{ marginTop: 24 }}>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 40 }}><Spin size="large" /></div>
+          ) : error ? (
+            <Alert type="error" message={error} />
+          ) : (
+            <Table dataSource={payments} rowKey={(r) => r.id} columns={columns} pagination={{ pageSize: 8 }} className="modern-payment-table" />
+          )}
+        </div>
 
         <Modal open={open} onCancel={() => setOpen(false)} footer={null} title="Make a Payment">
           <Form layout="vertical" form={form} onFinish={submit}>

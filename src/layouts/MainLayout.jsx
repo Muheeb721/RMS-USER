@@ -1,9 +1,8 @@
 import { Layout } from "antd";
 import { Link, Outlet, useLocation } from "react-router-dom";
-import { useState } from 'react';
 import { motion } from "framer-motion";
 import HeaderNav from "../components/Header";
-// Sidebar removed per request; header will show site-wide
+import ChatBot from "../components/ChatBot/ChatBot";
 import "../styles/global.css";
 
 const { Content, Footer } = Layout;
@@ -11,15 +10,12 @@ const { Content, Footer } = Layout;
 function MainLayout() {
   const location = useLocation();
   const showHeader = location.pathname !== "/signup" && location.pathname !== "/signup/";
-  const isAdmin = location.pathname.startsWith('/admin');
-  // no sidebar collapsed state needed when header is primary navigation
-  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#f6f8fc" }}>
       {showHeader && <HeaderNav />}
 
-      <div className={"main-content"}>
+      <div className="main-content">
         <Content className="page-shell">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -30,6 +26,8 @@ function MainLayout() {
           </motion.div>
         </Content>
       </div>
+
+      <ChatBot />
 
       <Footer
         style={{
@@ -66,7 +64,6 @@ function MainLayout() {
               <Link to="/services">Services</Link>
               <Link to="/demo">Demo</Link>
               <Link to="/contact">Contact</Link>
-              
             </div>
           </div>
           <div>

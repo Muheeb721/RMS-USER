@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Table, Tag, Button, Space } from 'antd';
 import { read, update } from '../services/rentService.jsx';
-import { readBookings, updateBooking } from '../utils/rentalBookingStorage.jsx';
+import bookingService from '../services/bookingService';
 import { useProperties } from '../contexts/PropertyContext';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
@@ -9,7 +9,7 @@ import { recordAdminAction } from '../services/adminActivityService.jsx';
 
 function AdminRentPage() {
   const [records, setRecords] = useState(() => read());
-  const [bookings, setBookings] = useState(() => readBookings());
+  const [bookings, setBookings] = useState([]);
   const { setPropertyStatus } = useProperties();
 
   useEffect(() => {
@@ -19,9 +19,19 @@ function AdminRentPage() {
   }, []);
 
   useEffect(() => {
-    const onUpdate = () => setBookings(readBookings());
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await bookingService.listAllBookings();
+        if (mounted && res && res.success) setBookings(res.data || []);
+      } catch (e) {
+        console.error('Unable to load bookings for admin', e);
+      }
+    };
+    load();
+    const onUpdate = () => load();
     window.addEventListener('rms-rental-bookings-updated', onUpdate);
-    return () => window.removeEventListener('rms-rental-bookings-updated', onUpdate);
+    return () => { mounted = false; window.removeEventListener('rms-rental-bookings-updated', onUpdate); };
   }, []);
 
   const summary = useMemo(() => {
@@ -47,28 +57,13 @@ function AdminRentPage() {
 
   const approveBooking = async (b) => {
     try {
-      updateBooking(b.id || b.bookingId, { bookingStatus: 'Approved' });
-      if (b.propertyId) setPropertyStatus(b.propertyId, 'Reserved');
-      setBookings(readBookings());
-
-      await recordAdminAction({
-        actionType: 'BOOKING_APPROVED',
-        entityType: 'BOOKING',
-        entityId: b.id || b.bookingId,
-        userId: b.userId || b.userEmail,
-        userName: b.userName,
-        propertyName: b.propertyName,
-        previousStatus: b.bookingStatus || 'Pending',
-        newStatus: 'Approved',
-        message: `Your booking for ${b.propertyName} has been approved by the admin.`,
-        reason: 'Booking verified successfully.',
-        description: `Admin approved booking ${b.bookingId || b.id}`,
-      });
-
-      try {
-        const note = createNotification({ type: 'booking', title: 'Booking Approved', message: `Your booking ${b.bookingId || b.id} for ${b.propertyName} has been approved.`, userName: b.userName, email: b.userEmail });
-        addStoredNotification(note);
-      } catch (e) {}
+      const id = b._id || b.id || b.bookingId;
+      const res = await bookingService.approveBooking(id);
+      if (res && res.success) {
+        // refresh bookings
+        const next = await bookingService.listAllBookings();
+        if (next && next.success) setBookings(next.data || []);
+      }
     } catch (e) {
       console.error('approveBooking', e);
     }
@@ -76,27 +71,12 @@ function AdminRentPage() {
 
   const rejectBooking = async (b) => {
     try {
-      updateBooking(b.id || b.bookingId, { bookingStatus: 'Rejected' });
-      setBookings(readBookings());
-
-      await recordAdminAction({
-        actionType: 'BOOKING_REJECTED',
-        entityType: 'BOOKING',
-        entityId: b.id || b.bookingId,
-        userId: b.userId || b.userEmail,
-        userName: b.userName,
-        propertyName: b.propertyName,
-        previousStatus: b.bookingStatus || 'Pending',
-        newStatus: 'Rejected',
-        message: `Your booking for ${b.propertyName} was rejected by the admin.`,
-        reason: 'Booking did not meet the required criteria.',
-        description: `Admin rejected booking ${b.bookingId || b.id}`,
-      });
-
-      try {
-        const note = createNotification({ type: 'booking', title: 'Booking Rejected', message: `Your booking ${b.bookingId || b.id} for ${b.propertyName} has been rejected.`, userName: b.userName, email: b.userEmail });
-        addStoredNotification(note);
-      } catch (e) {}
+      const id = b._id || b.id || b.bookingId;
+      const res = await bookingService.rejectBooking(id, { reason: 'Rejected by admin' });
+      if (res && res.success) {
+        const next = await bookingService.listAllBookings();
+        if (next && next.success) setBookings(next.data || []);
+      }
     } catch (e) {
       console.error('rejectBooking', e);
     }
@@ -104,13 +84,16 @@ function AdminRentPage() {
 
   const markPropertyRented = (b) => {
     try {
-      updateBooking(b.id || b.bookingId, { bookingStatus: 'Approved' });
-      if (b.propertyId) setPropertyStatus(b.propertyId, 'Rented');
-      setBookings(readBookings());
-      try {
-        const note = createNotification({ type: 'booking', title: 'Booking Confirmed - Rented', message: `Booking ${b.bookingId || b.id} marked as rented for ${b.propertyName}.`, userName: b.userName, email: b.userEmail });
-        addStoredNotification(note);
-      } catch (e) {}
+      const id = b._id || b.id || b.bookingId;
+      bookingService.approveBooking(id).then((res) => {
+        if (res && res.success) {
+          if (b.propertyId) setPropertyStatus(b.propertyId, 'Rented');
+          try {
+            const note = createNotification({ type: 'booking', title: 'Booking Confirmed - Rented', message: `Booking ${b.bookingId || b.id} marked as rented for ${b.propertyName}.`, userName: b.userName, email: b.userEmail });
+            addStoredNotification(note);
+          } catch (e) {}
+        }
+      }).catch((e) => console.error('markPropertyRented approve failed', e));
     } catch (e) {
       console.error('markPropertyRented', e);
     }

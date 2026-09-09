@@ -69,11 +69,52 @@
 
 .property-card.compact {
   margin-bottom: 16px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid #edf2f7;
+  background: white;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
 }
 
 .management-preview h3 {
   margin-top: 0;
   margin-bottom: 16px;
+}
+
+.listing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+}
+
+.card-image {
+  min-height: 220px;
+  background-size: cover;
+  background-position: center;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.card-body {
+  padding: 18px;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.price {
+  margin: 0;
+  font-weight: 800;
+  color: #0b2450;
+}
+
+.location {
+  margin: 8px 0 0;
+  color: #64748b;
 }
 
 .card-actions {

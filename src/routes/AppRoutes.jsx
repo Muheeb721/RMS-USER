@@ -22,6 +22,7 @@ const ComparePage = lazy(() => import('../pages/ComparePage'));
 const SavedSearchesPage = lazy(() => import('../pages/SavedSearchesPage'));
 const AIRecommendationsPage = lazy(() => import('../pages/AIRecommendationsPage'));
 const BookingsPage = lazy(() => import('../pages/BookingsPage'));
+const RentalApplicationPage = lazy(() => import('../pages/RentalApplicationPage'));
 const HostelListingsPage = lazy(() => import('../pages/HostelListingsPage'));
 const HostelDetailsPage = lazy(() => import('../pages/HostelDetailsPage'));
 const UserDashboardPage = lazy(() => import('../pages/UserDashboardPage'));
@@ -71,6 +72,7 @@ function AppRoutes() {
           <Route path="/bookings" element={<BookingsPage />} />
           <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/properties/:id" element={<PropertyDetailsPage />} />
+          <Route path="/rental-application" element={<RentalApplicationPage />} />
           <Route path="/hostels" element={<HostelListingsPage />} />
           <Route path="/hostels/:id" element={<HostelDetailsPage />} />
           <Route path="/favorites" element={<FavoritesPage />} />

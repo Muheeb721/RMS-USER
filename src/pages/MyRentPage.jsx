@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Row, Col, Tag, Table, Statistic, Button } from 'antd';
+import { Card, Row, Col, Tag, Table, Statistic, Button, Modal } from 'antd';
 import { useSelector } from 'react-redux';
 import { read, getMyRentSummary } from '../services/rentService.jsx';
 import { createNotification } from '../services/notificationService.jsx';
@@ -7,6 +7,7 @@ import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { useNavigate } from 'react-router-dom';
 import PaymentModal from '../components/PaymentModal';
 import api from '../services/api';
+import './MyRentPage.css';
 
 function MyRentPage() {
   const user = useSelector((state) => state.auth?.user || {});
@@ -15,6 +16,8 @@ function MyRentPage() {
   const navigate = useNavigate();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsBooking, setDetailsBooking] = useState(null);
 
   const refreshBookings = async () => {
     try {
@@ -61,6 +64,7 @@ function MyRentPage() {
     { title: 'Actions', key: 'actions', render: (_text, record) => (
       <div style={{ display: 'flex', gap: 8 }}>
         <Button onClick={() => navigate(`/properties/${record.propertyId}`)}>View Property</Button>
+        <Button onClick={() => { setDetailsBooking(record); setDetailsOpen(true); }}>View Details</Button>
         <Button type="primary" onClick={() => { setSelectedBooking(record); setPaymentOpen(true); }}>Pay</Button>
         <Button danger onClick={() => handleCancelBooking(record)}>Cancel</Button>
       </div>
@@ -89,52 +93,95 @@ function MyRentPage() {
   };
 
   return (
-    <div className="page-shell">
-      <section className="section-card">
-        <h2 className="section-title">My Rent</h2>
-        <p className="section-subtitle">Track your rent, outstanding balance, and payment schedule.</p>
+    <div className="page-shell my-rent-page-shell">
+      <section className="section-card my-rent-shell">
+        <div className="my-rent-header">
+          <div>
+            <span className="eyebrow">Rental management</span>
+            <h2 className="section-title">My Rentals</h2>
+            <p className="section-subtitle">Monitor active leases, payment status, and next rent reminders.</p>
+          </div>
+          <Button type="primary" onClick={() => navigate('/properties')}>Browse Properties</Button>
+        </div>
 
         <Row gutter={[16, 16]} style={{ marginTop: 20 }}>
           <Col xs={24} md={6}>
-            <Card>
-              <Statistic title="Current Rent" value={summary.totalMonthly} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} />
+            <Card className="rent-summary-card">
+              <div className="rent-card-top">Current Rent</div>
+              <Statistic value={summary.totalMonthly} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} />
             </Card>
           </Col>
           <Col xs={24} md={6}>
-            <Card>
-              <Statistic title="Outstanding" value={summary.totalDue} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} />
+            <Card className="rent-summary-card warning-card">
+              <div className="rent-card-top">Outstanding</div>
+              <Statistic value={summary.totalDue} prefix="Rs " formatter={(value) => Number(value).toLocaleString()} />
             </Card>
           </Col>
           <Col xs={24} md={6}>
-            <Card>
-              <Statistic title="Next Due" value={summary.nextDue ? new Date(summary.nextDue.dueDate).toLocaleDateString() : '—'} />
+            <Card className="rent-summary-card">
+              <div className="rent-card-top">Next Due</div>
+              <Statistic value={summary.nextDue ? new Date(summary.nextDue.dueDate).toLocaleDateString() : '—'} />
             </Card>
           </Col>
           <Col xs={24} md={6}>
-            <Card>
-              <Statistic title="Status" value={summary.records.some((item) => item.status === 'Overdue') ? 'Overdue' : summary.records.some((item) => item.status === 'Partial') ? 'Partial' : 'On Track'} />
+            <Card className="rent-summary-card success-card">
+              <div className="rent-card-top">Status</div>
+              <Statistic value={summary.records.some((item) => item.status === 'Overdue') ? 'Overdue' : summary.records.some((item) => item.status === 'Partial') ? 'Partial' : 'On Track'} />
             </Card>
           </Col>
         </Row>
 
         <div style={{ marginTop: 24 }}>
           {(!summary.records || summary.records.length === 0) && (!bookings || bookings.length === 0) ? (
-            <div style={{ padding: 40, textAlign: 'center' }}>
+            <div className="empty-rent-state">
               <h3>No rental records found.</h3>
               <p>It looks like you don't have any active rentals yet. Browse properties to find a place to rent.</p>
               <Button type="primary" onClick={() => navigate('/properties')}>Explore Properties</Button>
             </div>
           ) : (
             <>
-              <Table dataSource={summary.records} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
-              <h3 style={{ marginTop: 24 }}>My Rental Bookings</h3>
-              <Table dataSource={bookings} columns={bookingColumns} rowKey="id" pagination={{ pageSize: 8 }} />
+              <div className="rental-table-wrap">
+                <Table dataSource={summary.records} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} className="modern-rent-table" />
+              </div>
+              <h3 className="subsection-title">My Rental Bookings</h3>
+              <div className="rental-table-wrap">
+                <Table dataSource={bookings} columns={bookingColumns} rowKey="id" pagination={{ pageSize: 8 }} className="modern-rent-table" />
+              </div>
               <PaymentModal open={paymentOpen} booking={selectedBooking} onClose={async (ok) => {
                 setPaymentOpen(false);
                 setSelectedBooking(null);
                 await refreshBookings();
                 if (ok) { /* optional toast */ }
               }} />
+              <Modal open={detailsOpen} title="Booking Details" footer={null} onCancel={() => { setDetailsOpen(false); setDetailsBooking(null); }} width={800}>
+                {detailsBooking ? (
+                  <div>
+                    <h3>{detailsBooking.propertyName || detailsBooking.propertyTitle}</h3>
+                    <p><strong>Booking ID:</strong> {detailsBooking.bookingId || detailsBooking.id}</p>
+                    <p><strong>Type:</strong> {detailsBooking.propertyType}</p>
+                    <p><strong>Rent:</strong> Rs {Number(detailsBooking.rent || detailsBooking.amount || 0).toLocaleString()}</p>
+                    <p><strong>Move-in:</strong> {detailsBooking.moveInDate ? new Date(detailsBooking.moveInDate).toLocaleDateString() : '—'}</p>
+                    <p><strong>Duration:</strong> {detailsBooking.rentalDuration || '—'}</p>
+                    <h4>Applicant Information</h4>
+                    <p><strong>Name:</strong> {detailsBooking.userName || detailsBooking.customerName}</p>
+                    <p><strong>Email:</strong> {detailsBooking.userEmail}</p>
+                    <p><strong>Phone:</strong> {detailsBooking.userPhone || detailsBooking.customerPhone}</p>
+                    <p><strong>CNIC:</strong> {detailsBooking.cnic || '—'}</p>
+                    <h4>Current Address</h4>
+                    <p>{detailsBooking.addressLine1 || ''} {detailsBooking.addressLine2 || ''}</p>
+                    <p>{detailsBooking.city || ''}, {detailsBooking.province || ''}, {detailsBooking.country || ''}</p>
+                    <h4>Employment</h4>
+                    <p><strong>Status:</strong> {detailsBooking.employmentStatus || '—'}</p>
+                    <p><strong>Company:</strong> {detailsBooking.companyName || '—'}</p>
+                    <p><strong>Job Title:</strong> {detailsBooking.jobTitle || '—'}</p>
+                    <h4>References</h4>
+                    <p><strong>Previous Landlord:</strong> {detailsBooking.previousLandlordName || '—'}</p>
+                    <p><strong>Phone:</strong> {detailsBooking.previousLandlordPhone || '—'}</p>
+                    <h4>Notes</h4>
+                    <p>{detailsBooking.message || detailsBooking.notes || '—'}</p>
+                  </div>
+                ) : null}
+              </Modal>
             </>
           )}
         </div>

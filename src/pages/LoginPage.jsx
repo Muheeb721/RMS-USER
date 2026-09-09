@@ -64,9 +64,36 @@ function LoginPage() {
     }
 
     const currentToken = window.__RMS_AUTH_TOKEN || window.__rms_inmemory_token || '';
-    const hasSession = Boolean(currentToken || window.localStorage.getItem('rms_auth_session'));
+    const persistedSessionRaw = window.localStorage.getItem('rms_auth_session');
+    const hasSession = Boolean(currentToken || persistedSessionRaw);
+
+    // If there is a persisted session, validate it with the backend before redirecting.
     if (hasSession) {
-      navigate(resolveDashboardRoute(window.localStorage.getItem('rms_user_role') || 'resident', '/dashboard'), { replace: true });
+      (async () => {
+        try {
+          const meRes = await authService.me();
+            const ok = Boolean(meRes && (meRes.success || meRes.data));
+          if (ok) {
+            const userData = meRes.data || {};
+            navigate(resolveDashboardRoute(window.localStorage.getItem('rms_user_role') || userData.role || 'resident', '/dashboard'), { replace: true });
+            return;
+          }
+        } catch (err) {
+            console.warn('Session validation failed', err);
+            try { toast.warn('Existing session invalid — please log in.'); } catch (e) {}
+        }
+
+        // session invalid or validation failed: clear persisted traces so login page stays
+        try {
+          window.localStorage.removeItem('rms_auth_session');
+          window.localStorage.removeItem('rms_token');
+          window.localStorage.removeItem('rms_user_role');
+          delete window.__RMS_AUTH_TOKEN;
+          delete window.__rms_inmemory_token;
+        } catch (e) {
+          // ignore
+        }
+      })();
     }
   }, [form, navigate]);
 

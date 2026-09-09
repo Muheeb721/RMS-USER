@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Spin, Alert } from 'antd';
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from 'react-redux';
@@ -21,21 +21,29 @@ import {
   readStoredNotifications,
   saveStoredNotifications,
 } from "../utils/notificationsStorage.jsx";
+import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchNotificationsFromServer, markAllNotificationsOnServer, deleteNotificationOnServer } from '../services/notificationService.jsx';
+import {
+  fetchNotificationsFromServer,
+  markAllNotificationsOnServer,
+  deleteNotificationOnServer,
+  markNotificationAsReadOnServer,
+} from '../services/notificationService.jsx';
 import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   removeNotification,
   setNotifications as setReduxNotifications,
 } from '../redux/store';
-import { markNotificationAsReadOnServer } from '../services/notificationService.jsx';
 
 const navItems = [
   { label: "Home", to: "/", icon: <HomeOutlined /> },
   { label: "Properties", to: "/properties", icon: <ApartmentOutlined /> },
   { label: "Dashboard", to: "/dashboard", icon: <DashboardOutlined /> },
   { label: "Settings", to: "/settings", icon: <SettingOutlined /> },
+  { label: "Payments", to: "/payments", icon: <DollarCircleOutlined /> },
+  { label: "Maintenance", to: "/maintenance", icon: <ToolOutlined /> },
+  { label: "Messages", to: "/contact", icon: <MessageOutlined /> },
 ];
 
 const initialNotifications = [
@@ -145,53 +153,58 @@ const filters = [
 
 function NotificationsPage() {
   const dispatch = useDispatch();
+  const { isAuthenticated, user } = useAuth();
   const storedNotifications = useSelector((state) => Array.isArray(state.auth?.notifications) ? state.auth.notifications : []);
   const [activeFilter, setActiveFilter] = useState("All");
   const [notifications, setNotificationsList] = useState(() => readStoredNotifications(initialNotifications));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const loadOnceRef = useRef(false);
+  const authKey = `${Boolean(isAuthenticated)}-${user?.email || user?.id || 'guest'}`;
 
   useEffect(() => {
+    if (!isAuthenticated && !user?.email) {
+      const fallbackNotifications = initialNotifications.map(normalizeIncoming);
+      setNotificationsList(fallbackNotifications);
+      dispatch(setReduxNotifications(fallbackNotifications));
+      setLoading(false);
+      setError(null);
+      return undefined;
+    }
+
+    if (loadOnceRef.current && loadOnceRef.current === authKey) {
+      return undefined;
+    }
+
+    loadOnceRef.current = authKey;
+
     let mounted = true;
     const load = async () => {
       setLoading(true);
       setError(null);
 
-      const fallbackNotifications = initialNotifications.map(normalizeIncoming);
-
       try {
-        // Prefer backend when the user is authenticated (use auth context or token)
-        const isAuthed = Boolean(window.__RMS_AUTH_TOKEN || window.__rms_inmemory_token || (window.localStorage.getItem && window.localStorage.getItem('rms_auth_session')));
-        if (isAuthed) {
-          const res = await fetchNotificationsFromServer();
-          if (res && res.success && Array.isArray(res.data) && res.data.length) {
-            if (!mounted) return;
-            const normalized = res.data.map(normalizeIncoming);
-            setNotificationsList(normalized);
-            dispatch(setReduxNotifications(normalized));
-            saveStoredNotifications(normalized);
-            setLoading(false);
-            return;
-          }
+        const res = await fetchNotificationsFromServer();
+        if (!mounted) return;
+
+        if (res && res.success && Array.isArray(res.data) && res.data.length) {
+          const normalized = res.data.map(normalizeIncoming);
+          setNotificationsList(normalized);
+          dispatch(setReduxNotifications(normalized));
+          saveStoredNotifications(normalized);
+          setLoading(false);
+          return;
         }
+
+        const fallbackNotifications = initialNotifications.map(normalizeIncoming);
+        setNotificationsList(fallbackNotifications);
+        dispatch(setReduxNotifications(fallbackNotifications));
+        saveStoredNotifications(fallbackNotifications);
       } catch (e) {
         console.warn('fetch notifications failed', e);
-      }
-
-      try {
-        const merged = fallbackNotifications;
-        if (!storedNotifications || storedNotifications.length === 0) {
-          if (!mounted) return;
-          setNotificationsList(merged);
-          dispatch(setReduxNotifications(merged));
-        } else {
-          if (!mounted) return;
-          setNotificationsList(storedNotifications.map(normalizeIncoming));
-        }
-      } catch (e) {
-        console.error('Failed to load notifications', e);
-        if (mounted) setError('Unable to load notifications');
+        if (!mounted) return;
+        setError('Unable to load notifications.');
       } finally {
         if (mounted) setLoading(false);
       }
@@ -202,7 +215,7 @@ function NotificationsPage() {
     return () => {
       mounted = false;
     };
-  }, [dispatch, storedNotifications]);
+  }, [authKey, dispatch, isAuthenticated, user?.email, user?.id]);
 
   const normalizeIncoming = (it) => {
     const id = it.id || it._id || it._id?.toString() || Date.now();
@@ -217,28 +230,6 @@ function NotificationsPage() {
     const category = it.category || (it.type ? String(it.type).charAt(0).toUpperCase() + String(it.type).slice(1) : 'General');
     return { ...it, id, title, message, time, createdAt, unread, accent, icon, category, action: it.action || 'View', featured: !!it.featured, propertyName: it.propertyName || it.raw?.propertyName || '' };
   };
-
-  useEffect(() => {
-    const syncNotifications = () => {
-      const next = readStoredNotifications(initialNotifications);
-      if (!storedNotifications || storedNotifications.length === 0) {
-        setNotificationsList(next);
-        dispatch(setReduxNotifications(next));
-      } else {
-        // prefer Redux-provided notifications (server) but merge any extra stored ones
-        const combined = [...storedNotifications, ...next].filter((item, idx, arr) => arr.findIndex(e => e.id === item.id) === idx);
-        setNotificationsList(combined);
-        dispatch(setReduxNotifications(combined));
-      }
-    };
-
-    window.addEventListener("rms-notifications-updated", syncNotifications);
-    syncNotifications();
-
-    return () => {
-      window.removeEventListener("rms-notifications-updated", syncNotifications);
-    };
-  }, [dispatch]);
 
   useEffect(() => {
     if (storedNotifications.length) {

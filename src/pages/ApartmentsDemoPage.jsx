@@ -5,6 +5,7 @@ import './demopage.css';
 import FavoriteToggle from '../components/FavoriteToggle';
 import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
 import { getPrimaryImage } from '../utils/imageUtils';
+import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 
 const emptyForm = {
   title: '',
@@ -140,9 +141,9 @@ function ApartmentsDemoPage() {
         <div className="management-preview user-facing">
           <h3>Apartment listings</h3>
           <div className="listing-grid">
-            {filteredProperties.slice(0, 10).map((property) => (
+            {filteredProperties.slice(0, 10).map((property, index) => (
               <article className="property-card compact" key={property.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${getPrimaryImage(property)})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${resolveUniquePropertyImage(property, 'demo', index)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{property.type}</span>

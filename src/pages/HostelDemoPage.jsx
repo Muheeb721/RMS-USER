@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { hostelData } from '../data/dummyData';
 import './demopage.css';
 import { saveSelectedProperty } from '../utils/selectedPropertyStorage.jsx';
+import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 
 const categories = ['All', 'Hostel', 'Boys Hostel', 'Girls Hostel', 'Family Hostel'];
 
@@ -79,9 +80,9 @@ function HostelDemoPage() {
 
         <div className="management-layout" style={{ gridTemplateColumns: '1fr' }}>
           <div className="management-preview">
-            {filteredHostels.map((hostel) => (
+            {filteredHostels.map((hostel, index) => (
               <article className="property-card compact" key={hostel.id}>
-                <div className="card-image" style={{ backgroundImage: `url(${hostel.image})` }} />
+                <div className="card-image" style={{ backgroundImage: `url(${resolveUniquePropertyImage(hostel, 'demo', index)})` }} />
                 <div className="card-body">
                   <div className="card-meta">
                     <span className="card-type">{hostel.type}</span>

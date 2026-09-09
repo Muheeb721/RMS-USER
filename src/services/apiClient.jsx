@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 const apiClient = axios.create({
   baseURL: '/api',
@@ -35,9 +36,15 @@ apiClient.interceptors.response.use(
     if (error.response) {
       const { status } = error.response;
       if (status === 401) {
-        // Optionally broadcast auth failure so UI can redirect to login
+        // broadcast auth failure so UI can redirect to login
         window.dispatchEvent(new CustomEvent('rms:auth:unauthorized'));
+        try { toast.warn('Session expired or unauthorized. Please log in again.'); } catch (e) {}
+      } else if (status >= 500) {
+        try { toast.error('Server error communicating with backend.'); } catch (e) {}
       }
+    } else {
+      // Network or CORS error
+      try { toast.warn('Network error: unable to reach backend.'); } catch (e) {}
     }
     return Promise.reject(error);
   }

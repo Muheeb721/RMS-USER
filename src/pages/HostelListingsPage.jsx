@@ -73,11 +73,11 @@ function HostelListingsPage() {
         </Row>
         <Divider />
         <Row gutter={[16, 16]}>
-          {hostels.map((hostel) => (
+          {hostels.map((hostel, index) => (
             <Col xs={24} md={12} lg={8} key={hostel.id}>
               <Card
                 className="hostel-card"
-                cover={<img alt={hostel.title} src={getPrimaryImage(hostel) || FALLBACK_IMAGE} style={{ width: '100%', height: 200, objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />}
+                cover={<img alt={hostel.title} src={getPrimaryImage(hostel, index, 'demo') || FALLBACK_IMAGE} style={{ width: '100%', height: 200, objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />}
               >
                 <div className="card-body">
                   <div

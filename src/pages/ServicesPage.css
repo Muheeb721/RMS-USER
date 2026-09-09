@@ -79,25 +79,34 @@
   z-index: 10;
   display: flex;
   justify-content: center;
-  gap: 18px;
+  align-items: center;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   border-radius: 999px;
-  padding: 12px 18px;
+  padding: 10px 14px;
   margin-bottom: 32px;
   backdrop-filter: blur(10px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  flex-wrap: wrap;
 }
 
-.services-nav a {
+.services-nav button {
+  border: none;
+  background: transparent;
   color: #0f172a;
   font-weight: 700;
   letter-spacing: 0.01em;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
+  border-radius: 999px;
+  padding: 9px 14px;
+  cursor: pointer;
 }
 
-.services-nav a:hover,
-.services-nav a:focus {
+.services-nav button:hover,
+.services-nav button:focus {
   color: #0ea5e9;
+  background: rgba(14, 165, 233, 0.08);
 }
 
 .services-stats-strip {

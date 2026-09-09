@@ -14,6 +14,7 @@ import { listForProperty as listPriceHistory } from '../utils/priceHistoryStorag
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { increment as incrementView, getCount as getViewCount } from '../utils/propertyViewsStorage';
 import { isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage';
+import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 const { Text } = Typography;
 import { toast } from 'react-toastify';
 
@@ -60,6 +61,7 @@ function PropertyDetailsPage() {
         if (res && res.success && res.data) {
           const item = res.data;
           const imgs = Array.isArray(item.images) && item.images.length ? item.images : item.image ? [item.image] : [];
+          const uniqueImages = imgs.map((src, index) => resolveUniquePropertyImage({ ...item, image: src, title: item.title || item.name || 'Property', type: item.type || item.propertyType || item.category || 'Property' }, 'properties', index)).filter(Boolean);
           const normalized = {
             id: item._id || item.id || fallbackId,
             title: item.title || item.name || 'Untitled Property',
@@ -73,8 +75,8 @@ function PropertyDetailsPage() {
             bathrooms: item.bathrooms || 0,
             parking: item.parking || 0,
             status: item.status || item.availability || 'Available',
-            image: imgs[0] || FALLBACK_IMAGE,
-            images: imgs.length ? imgs : [FALLBACK_IMAGE],
+            image: uniqueImages[0] || resolveUniquePropertyImage({ ...item, title: item.title || item.name || 'Property', type: item.type || item.propertyType || item.category || 'Property' }, 'properties', 0) || FALLBACK_IMAGE,
+            images: uniqueImages.length ? uniqueImages : [resolveUniquePropertyImage({ ...item, title: item.title || item.name || 'Property', type: item.type || item.propertyType || item.category || 'Property' }, 'properties', 0) || FALLBACK_IMAGE],
             owner: item.ownerName || item.owner || 'RMS Admin',
             contact: item.contact || '+92 300 1234567',
           };
@@ -108,9 +110,9 @@ function PropertyDetailsPage() {
       const imgs = Array.isArray(property.images) && property.images.length > 0
         ? property.images.slice()
         : property.image ? [property.image] : [];
-      // fallback default image if empty
-      if (!imgs.length) imgs.push(FALLBACK_IMAGE);
-      setImages(imgs);
+      const unique = imgs.map((src, index) => resolveUniquePropertyImage({ ...property, image: src, title: property.title || 'Property', type: property.type || 'Property' }, 'properties', index)).filter(Boolean);
+      if (!unique.length) unique.push(resolveUniquePropertyImage({ ...property, title: property.title || 'Property', type: property.type || 'Property' }, 'properties', 0) || FALLBACK_IMAGE);
+      setImages(unique);
       setCurrentIndex(0);
     } catch (e) {
       setImages([]);
@@ -270,7 +272,25 @@ function PropertyDetailsPage() {
                 </Button>
                 <Button onClick={() => setVisitOpen(true)}>Schedule a Visit</Button>
                 {property.transactionType === 'Rent' && (
-                  <Button type="primary" onClick={() => setBookingOpen(true)} style={{ background: '#28b463', borderColor: '#28b463' }}>Rent Now</Button>
+                  <Button
+                    type="primary"
+                    onClick={async () => {
+                      if (!isAuthenticated) {
+                        navigate(`/login?redirect=${encodeURIComponent(`/rental-application?propertyId=${property.id}`)}`);
+                        return;
+                      }
+                      try {
+                        const m = await import('../utils/selectedPropertyStorage.jsx');
+                        await m.saveSelectedProperty(property);
+                      } catch (e) {
+                        console.warn('Save selected property failed', e);
+                      }
+                      navigate(`/rental-application?propertyId=${property.id}`);
+                    }}
+                    style={{ background: '#28b463', borderColor: '#28b463' }}
+                  >
+                    Rent Now
+                  </Button>
                 )}
                 <Button onClick={() => { setIsSaved((saved) => !saved); toast.success(isSaved ? 'Listing removed from saved items.' : 'Listing saved successfully.'); }}>{isSaved ? 'Saved' : 'Save Listing'}</Button>
               </div>

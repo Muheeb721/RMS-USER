@@ -2,7 +2,7 @@ import { Badge } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
 import NotificationDrawer from './NotificationDrawer';
 import { markAllNotificationsAsRead, markNotificationAsRead, removeNotification, setNotifications } from '../../redux/store';
@@ -16,6 +16,7 @@ function NotificationBell() {
   const notifications = useSelector((state) => Array.isArray(state.auth?.notifications) ? state.auth.notifications : []);
   const [isOpen, setIsOpen] = useState(false);
   const [serverUnread, setServerUnread] = useState(null);
+  const unreadFetchRef = useRef('');
 
   const unreadCount = notifications.filter((item) => item.unread !== false).length;
 
@@ -41,18 +42,38 @@ function NotificationBell() {
 
   useEffect(() => {
     const session = readSessionUser();
-    if (!session?.email) {
+    const authReady = Boolean(session?.email || session?.role);
+
+    if (!authReady || location.pathname === '/notifications') {
       setServerUnread(0);
+      unreadFetchRef.current = '';
       return undefined;
     }
+
+    const cacheKey = `${session.email || 'unknown'}-${session.role || 'user'}`;
+    if (unreadFetchRef.current === cacheKey) {
+      return undefined;
+    }
+
+    unreadFetchRef.current = cacheKey;
 
     let mounted = true;
     (async () => {
       try {
         const res = await getUnreadCountFromServer();
-        if (mounted && res.success) setServerUnread(res.data?.count ?? 0);
+        if (mounted) {
+          if (res && res.success) setServerUnread(res.data?.count ?? 0);
+          else {
+            setServerUnread(0);
+            toast.warn('Unable to sync notifications from server. Showing local notifications only.');
+          }
+        }
       } catch (e) {
-        // ignore
+        console.warn('Unread count fetch failed', e);
+        if (mounted) {
+          setServerUnread(0);
+          toast.warn('Unable to sync notifications from server. Check backend connection.');
+        }
       }
     })();
 

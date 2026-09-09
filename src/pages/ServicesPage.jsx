@@ -13,13 +13,35 @@ import { useNavigate } from "react-router-dom";
 import "./ServicesPage.css";
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
 
+const artForService = (label, firstColor, secondColor) => {
+  const safeLabel = String(label || 'RMS').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="${firstColor}"/>
+          <stop offset="100%" stop-color="${secondColor}"/>
+        </linearGradient>
+      </defs>
+      <rect width="1200" height="800" fill="url(#g)"/>
+      <circle cx="980" cy="120" r="160" fill="rgba(255,255,255,0.16)"/>
+      <rect x="170" y="260" width="860" height="360" rx="30" fill="rgba(255,255,255,0.14)" stroke="rgba(255,255,255,0.35)"/>
+      <rect x="250" y="330" width="220" height="150" rx="18" fill="rgba(255,255,255,0.12)"/>
+      <rect x="500" y="330" width="180" height="150" rx="18" fill="rgba(255,255,255,0.1)"/>
+      <rect x="710" y="330" width="200" height="150" rx="18" fill="rgba(255,255,255,0.14)"/>
+      <text x="600" y="620" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="56" font-weight="700" fill="#ffffff">${safeLabel}</text>
+      <text x="600" y="675" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="28" fill="rgba(255,255,255,0.9)" font-weight="600">Residential Services</text>
+    </svg>
+  `;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 const serviceItems = [
   {
     title: "House Management",
     description:
       "Manage single-family residences, upkeep, payments, and resident communication in one place.",
-    image:
-      "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+    image: artForService('House', '#1f7a8c', '#6bbf59'),
     badge: "House",
     icon: <HomeOutlined />,
     highlights: [],
@@ -29,8 +51,7 @@ const serviceItems = [
     title: "Apartment Operations",
     description:
       "Streamline apartment workflows with centralized access, notices, and tenant onboarding.",
-    image:
-      "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80",
+    image: artForService('Apartment', '#2d6cdf', '#90e0ef'),
     badge: "Apartment",
     icon: <ApartmentOutlined />,
     highlights: [ ],
@@ -40,8 +61,7 @@ const serviceItems = [
     title: "Hostel Coordination",
     description:
       "Coordinate shared accommodations, roommate matching, billing, and incident logs effortlessly.",
-    image:
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80",
+    image: artForService('Hostel', '#5f4b8b', '#b5d99c'),
     badge: "Hostel",
     icon: <UsergroupAddOutlined />,
     highlights: [ ],
@@ -104,6 +124,13 @@ function ServicesPage() {
       </section>
 
      
+
+      <nav className="services-nav" aria-label="Service navigation">
+        <button type="button" onClick={() => navigate("/demo")}>Demo</button>
+        <button type="button" onClick={() => navigate("/properties")}>Properties</button>
+        <button type="button" onClick={() => navigate("/bookings")}>Bookings</button>
+        <button type="button" onClick={() => navigate("/ai-recommendations")}>AI Match</button>
+      </nav>
 
       <section id="stats" className="services-stats-strip">
         {metrics.map((metric) => (

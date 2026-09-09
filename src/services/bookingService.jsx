@@ -81,5 +81,41 @@ const remove = async (id) => {
   }
 };
 
-export { read, createBooking, update, remove };
-export default { read, createBooking, update, remove };
+const listAll = async () => {
+  try {
+    const res = await api.request('/bookings');
+    if (res && res.success) return Array.isArray(res.data) ? res.data.map(normalizeBooking) : [];
+    return [];
+  } catch (e) {
+    console.error('listAll bookings failed', e);
+    return [];
+  }
+};
+
+const approve = async (id) => {
+  try {
+    const res = await api.request(`/bookings/${id}/approve`, { method: 'POST' });
+    return res || { success: false };
+  } catch (e) {
+    console.error('approve booking failed', e);
+    return { success: false };
+  }
+};
+
+const reject = async (id, body = {}) => {
+  try {
+    const res = await api.request(`/bookings/${id}/reject`, { method: 'POST', body });
+    return res || { success: false };
+  } catch (e) {
+    console.error('reject booking failed', e);
+    return { success: false };
+  }
+};
+
+// compatibility aliases
+const listAllBookings = listAll;
+const approveBooking = approve;
+const rejectBooking = reject;
+
+export { read, createBooking, update, remove, listAll, approve, reject, listAllBookings, approveBooking, rejectBooking };
+export default { read, createBooking, update, remove, listAll, approve, reject, listAllBookings, approveBooking, rejectBooking };

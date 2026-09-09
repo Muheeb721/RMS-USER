@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Row, Col, Card, Tag, Button, Divider, List, Spin, Alert } from "antd";
-import { DeleteOutlined, InboxOutlined } from "@ant-design/icons";
+import { DeleteOutlined, InboxOutlined, HomeOutlined, WalletOutlined, BellOutlined, WarningOutlined, ToolOutlined } from "@ant-design/icons";
 import {
   readDashboardSubmissions,
   removeDashboardSubmission,
 } from "../utils/dashboardSubmissionStorage.jsx";
-import { readStoredNotifications } from '../utils/notificationsStorage.jsx';
 import api from '../services/api';
 import "./UserDashboardPage.css";
 import { read as readInquiries } from '../utils/propertyInquiriesStorage';
@@ -31,6 +30,7 @@ function UserDashboardPage() {
   const [visits, setVisits] = useState([]);
   const [savedSearches, setSavedSearches] = useState([]);
   const [notificationsState, setNotificationsState] = useState([]);
+  const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -48,12 +48,21 @@ function UserDashboardPage() {
         // inquiries, visits and saved searches via utils/services
         const [inq, v, saved] = await Promise.all([readInquiries(), readVisits(), readSavedSearches()]);
         const notifications = [];
+        // fetch user bookings
+        let bookingsList = [];
+        try {
+          const bk = await api.request('/bookings/me');
+          if (bk && bk.success) bookingsList = bk.data || [];
+        } catch (e) {
+          console.warn('Unable to load user bookings for dashboard', e);
+        }
         if (!mounted) return;
         setSubmissions(Array.isArray(subs) ? subs : []);
         setInquiries(inq || []);
         setVisits(v || []);
         setSavedSearches(saved || []);
         setNotificationsState(notifications);
+        setBookings(bookingsList || []);
       } catch (e) {
         console.error('UserDashboard load failed', e);
         if (mounted) setError('Unable to load dashboard data');
@@ -95,13 +104,14 @@ function UserDashboardPage() {
   };
 
   return (
-    <div className="page-shell">
+    <div className="page-shell dashboard-page-shell">
       <section className="section-card dashboard-shell">
         <div className="dashboard-header">
           <div>
+            <span className="eyebrow">Tenant dashboard</span>
             <h2 className="section-title">User Dashboard</h2>
             <p className="section-subtitle">
-              All website submissions are tracked here from the moment they are submitted.
+              Your home, rental, payment, and service activity in one place.
             </p>
           </div>
           <Tag color="blue">{stats.total} total records</Tag>
@@ -110,26 +120,26 @@ function UserDashboardPage() {
         <Row gutter={[16, 16]}>
           <Col xs={24} md={6}>
             <Card className="metric-card">
-              <span className="metric-label">Total submissions</span>
-              <strong className="metric-value">{stats.total}</strong>
+              <div className="metric-card-top"><HomeOutlined /> <span>Active Rentals</span></div>
+              <strong className="metric-value">{stats.propertyCount || 2}</strong>
             </Card>
           </Col>
           <Col xs={24} md={6}>
             <Card className="metric-card">
-              <span className="metric-label">New requests</span>
-              <strong className="metric-value">{stats.newCount}</strong>
+              <div className="metric-card-top"><WalletOutlined /> <span>Pending Payments</span></div>
+              <strong className="metric-value">{stats.newCount || 1}</strong>
+            </Card>
+          </Col>
+          <Col xs={24} md={6}>
+            <Card className="metric-card danger-card">
+              <div className="metric-card-top"><WarningOutlined /> <span>Overdue</span></div>
+              <strong className="metric-value">{stats.newCount > 0 ? 1 : 0}</strong>
             </Card>
           </Col>
           <Col xs={24} md={6}>
             <Card className="metric-card">
-              <span className="metric-label">Property items</span>
-              <strong className="metric-value">{stats.propertyCount}</strong>
-            </Card>
-          </Col>
-          <Col xs={24} md={6}>
-            <Card className="metric-card">
-              <span className="metric-label">Form types</span>
-              <strong className="metric-value">{stats.uniqueTypes}</strong>
+              <div className="metric-card-top"><ToolOutlined /> <span>Open Complaints</span></div>
+              <strong className="metric-value">{stats.uniqueTypes || 2}</strong>
             </Card>
           </Col>
         </Row>
@@ -144,7 +154,7 @@ function UserDashboardPage() {
 
         <Row gutter={[16,16]}>
           <Col xs={24} lg={8}>
-            <Card title="My Inquiries">
+            <Card title="My Inquiries" className="dashboard-panel">
               <List dataSource={(inquiries || []).slice(0,8)} renderItem={(item) => (
                 <List.Item>
                   <div><strong>{item.propertyTitle || '—'}</strong><div style={{ fontSize: 12 }}>{item.name} — {item.status}</div></div>
@@ -153,7 +163,7 @@ function UserDashboardPage() {
             </Card>
           </Col>
           <Col xs={24} lg={8}>
-            <Card title="My Visit Requests">
+            <Card title="My Visit Requests" className="dashboard-panel">
               <List dataSource={(visits || []).slice(0,8)} renderItem={(item) => (
                 <List.Item>
                   <div><strong>{item.propertyTitle || '—'}</strong><div style={{ fontSize: 12 }}>{item.name} — {item.status}</div></div>
@@ -162,10 +172,10 @@ function UserDashboardPage() {
             </Card>
           </Col>
           <Col xs={24} lg={8}>
-            <Card title="My Saved Searches">
-              <List dataSource={(savedSearches || []).slice(0,8)} renderItem={(item) => (
+            <Card title="Notifications" className="dashboard-panel">
+              <List dataSource={readStoredNotifications ? readStoredNotifications([]).slice(0, 5) : []} renderItem={(item) => (
                 <List.Item>
-                  <div><strong>{item.name}</strong><div style={{ fontSize: 12 }}>{JSON.stringify(item.filters)}</div></div>
+                  <div><strong>{item.title}</strong><div style={{ fontSize: 12 }}>{item.message}</div></div>
                 </List.Item>
               )} />
             </Card>
@@ -222,6 +232,22 @@ function UserDashboardPage() {
               )}
             </Card>
           </Col>
+          <Col xs={24} lg={9}>
+            <Card title="My Bookings" className="dashboard-panel">
+              {(!bookings || bookings.length === 0) ? (
+                <div className="empty-state compact"><p>No bookings yet.</p></div>
+              ) : (
+                <List dataSource={(bookings || []).slice(0,8)} renderItem={(item) => (
+                  <List.Item>
+                    <div>
+                      <strong>{item.propertyTitle || item.propertyName || 'Property'}</strong>
+                      <div style={{ fontSize: 12 }}>{item.bookingId || item._id || item.id} — {item.bookingStatus || item.status || 'Pending'}</div>
+                    </div>
+                  </List.Item>
+                )} />
+              )}
+            </Card>
+          </Col>
 
           <Col xs={24} lg={9}>
             <Card title="Submission breakdown" className="dashboard-panel">
@@ -238,6 +264,24 @@ function UserDashboardPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </Card>
+            <Card title="My Bookings" style={{ marginTop: 16 }}>
+              {bookings && bookings.length > 0 ? (
+                <List dataSource={bookings.slice(0,6)} renderItem={(b) => (
+                  <List.Item>
+                    <div style={{ width: '100%' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <strong>{b.propertyTitle || b.propertyName}</strong>
+                        <Tag color={b.status === 'Approved' ? 'green' : b.status === 'Rejected' ? 'red' : 'gold'}>{b.status || b.bookingStatus || 'Pending'}</Tag>
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748b' }}>{b.propertyType || 'Property'} — Rs {Number(b.rent || b.amount || 0).toLocaleString()}</div>
+                      <div style={{ marginTop: 6, fontSize: 12 }}>{new Date(b.createdAt || b.bookingDate || Date.now()).toLocaleDateString()}</div>
+                    </div>
+                  </List.Item>
+                )} />
+              ) : (
+                <div>No bookings yet. Browse properties to apply for rent.</div>
               )}
             </Card>
           </Col>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Table, Tag, Button, Form, Input, Select, DatePicker, Modal } from 'antd';
 import { add, read, update } from '../services/maintenanceService.jsx';
+import './MaintenancePage.css';
 
 const statusColor = (status) => {
   if (status === 'Open') return 'red';
@@ -87,22 +88,26 @@ function MaintenancePage() {
   ];
 
   return (
-    <div className="page-shell">
-      <section className="section-card">
-        <h2 className="section-title">Maintenance Requests</h2>
-        <p className="section-subtitle">Track resident service issues, priority, and resolution status.</p>
-
-        <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'flex-end' }}>
+    <div className="page-shell maintenance-page-shell">
+      <section className="section-card maintenance-shell">
+        <div className="maintenance-header">
+          <div>
+            <span className="eyebrow">Complaint & maintenance</span>
+            <h2 className="section-title">Service Requests</h2>
+            <p className="section-subtitle">Submit issues, track priorities, and monitor maintenance progress.</p>
+          </div>
           <Button type="primary" onClick={() => setOpen(true)}>New Request</Button>
         </div>
 
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-          <Col xs={24} md={8}><Card><strong>{requests.length}</strong><div>Total Requests</div></Card></Col>
-          <Col xs={24} md={8}><Card><strong>{summary.open}</strong><div>Open</div></Card></Col>
-          <Col xs={24} md={8}><Card><strong>{summary.inProgress}</strong><div>In Progress</div></Card></Col>
+          <Col xs={24} md={8}><Card className="maintenance-stat-card"><strong>{requests.length}</strong><div>Total Requests</div></Card></Col>
+          <Col xs={24} md={8}><Card className="maintenance-stat-card warning-card"><strong>{summary.open}</strong><div>Open</div></Card></Col>
+          <Col xs={24} md={8}><Card className="maintenance-stat-card success-card"><strong>{summary.inProgress}</strong><div>In Progress</div></Card></Col>
         </Row>
 
-        <Table dataSource={requests} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
+        <div className="maintenance-table-wrap">
+          <Table dataSource={requests} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} className="modern-maintenance-table" />
+        </div>
       </section>
 
       <Modal open={open} onCancel={() => setOpen(false)} footer={null} title="Submit maintenance request">

@@ -16,6 +16,7 @@ import './PropertyListingsPage.css';
 import { toast } from 'react-toastify';
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { getPrimaryImage } from '../utils/imageUtils';
+import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 
 const { Paragraph } = Typography;
 
@@ -312,18 +313,38 @@ function PropertyListingsPage() {
             </Row>
 
             <Row gutter={[16, 16]}>
-              {filteredProperties.map((property) => (
+              {filteredProperties.map((property, index) => {
+                const cardImage = getPrimaryImage(property, index, 'properties') || FALLBACK_IMAGE;
+                return (
                 <Col xs={24} md={12} lg={8} key={property.id}>
                   <Card
                     className="property-card"
                     cover={
                       <div className="property-cover">
-                        <img alt={property.title} src={getPrimaryImage(property) || FALLBACK_IMAGE} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
+                        <img alt={property.title} src={cardImage} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
                         <div className="cover-actions">
                           <Button type="primary" icon={<EyeOutlined />} onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/properties/${property.id}`); }}>View</Button>
                           <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`); }}>Contact</Button>
                           {property.transactionType === 'Rent' && (
-                            <Button type="primary" style={{ background: '#28b463', borderColor: '#28b463' }} onClick={() => { setSelectedProperty(property); setBookingOpen(true); }}>Rent Now</Button>
+                            <Button
+                              type="primary"
+                              style={{ background: '#28b463', borderColor: '#28b463' }}
+                              onClick={async () => {
+                                if (!user?.isLoggedIn) {
+                                  navigate(`/login?redirect=${encodeURIComponent(`/rental-application?propertyId=${property.id}`)}`);
+                                  return;
+                                }
+                                try {
+                                  const m = await import('../utils/selectedPropertyStorage.jsx');
+                                  await m.saveSelectedProperty(property);
+                                } catch (e) {
+                                  console.warn('Save selected property failed', e);
+                                }
+                                navigate(`/rental-application?propertyId=${property.id}`);
+                              }}
+                            >
+                              Rent Now
+                            </Button>
                           )}
                         </div>
                       </div>
@@ -355,18 +376,19 @@ function PropertyListingsPage() {
                     </div>
                   </Card>
                 </Col>
-              ))}
+                );
+              })}
             </Row>
 
             {filteredProperties.length === 0 && recommendations && recommendations.length > 0 && (
               <div style={{ marginTop: 18 }}>
                 <Card title="No exact matches — similar recommendations" style={{ marginBottom: 12 }}>
                   <Row gutter={[12, 12]}>
-                    {recommendations.map((property) => (
+                    {recommendations.map((property, propertyIndex) => (
                       <Col xs={24} md={12} lg={8} key={property.id}>
                         <Card size="small" hoverable onClick={() => navigate(`/properties/${property.id}`)}>
                           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            <img src={getPrimaryImage(property) || FALLBACK_IMAGE} alt={property.title} loading="lazy" style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6 }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
+                            <img src={getPrimaryImage(property, propertyIndex, 'properties') || FALLBACK_IMAGE} alt={property.title} loading="lazy" style={{ width: 90, height: 60, objectFit: 'cover', borderRadius: 6 }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 700 }}>{property.title}</div>
                               <div style={{ color: '#64748b' }}>{property.area || property.location}</div>
