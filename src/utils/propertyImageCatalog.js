@@ -1,6 +1,85 @@
 import { FALLBACK_IMAGE } from './imageUtils';
 
 const LOCAL_IMAGE_ROOT = '/images';
+const catalogImageCache = {
+  HOME: [],
+  HOUSE: [],
+  FLAT: [],
+  APARTMENT: [],
+  PROPERTY: [],
+  DEMO: [],
+  OTHER: [],
+  __all: [],
+  __pages: {},
+  __loading: false,
+};
+
+const normalizeCatalogKey = (value = '') => {
+  const text = String(value || '').trim().toUpperCase();
+  if (text === 'HOUSES') return 'HOUSE';
+  if (text === 'FLATS') return 'FLAT';
+  if (text === 'APARTMENTS') return 'APARTMENT';
+  if (text === 'PROPERTIES') return 'PROPERTY';
+  if (text === 'HOME') return 'HOME';
+  if (text === 'DEMO') return 'DEMO';
+  return text || 'OTHER';
+};
+
+const loadCatalogImages = () => {
+  if (typeof window === 'undefined' || catalogImageCache.__loading) return;
+  catalogImageCache.__loading = true;
+
+  fetch('/api/images', {
+    headers: { Accept: 'application/json' },
+  })
+    .then((response) => response.json())
+    .then((payload) => {
+      if (!payload?.success) return;
+      const items = Array.isArray(payload.data) ? payload.data : [];
+      const next = { HOME: [], HOUSE: [], FLAT: [], APARTMENT: [], PROPERTY: [], DEMO: [], OTHER: [] };
+      const pageMap = {};
+      items.forEach((item) => {
+        const key = normalizeCatalogKey(item.category || 'OTHER');
+        const imageUrl = item.imageUrl || item.url || item.src || '';
+        if (next[key]) next[key].push(imageUrl);
+        const page = String(item.page || 'General').trim() || 'General';
+        const section = String(item.section || 'General').trim() || 'General';
+        if (!pageMap[page]) pageMap[page] = {};
+        if (!pageMap[page][section]) pageMap[page][section] = [];
+        if (imageUrl) pageMap[page][section].push(imageUrl);
+      });
+      Object.assign(catalogImageCache, next, { __all: items, __pages: pageMap });
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      catalogImageCache.__loading = false;
+    });
+};
+
+if (typeof window !== 'undefined') {
+  loadCatalogImages();
+}
+
+export const resolveCatalogPageImage = (page = 'General', section = 'General', index = 0, fallback = '') => {
+  const targetPage = String(page || 'General').trim() || 'General';
+  const targetSection = String(section || 'General').trim() || 'General';
+  const items = Array.isArray(catalogImageCache.__all) ? catalogImageCache.__all : [];
+  const matches = items.filter((item) => {
+    const itemPage = String(item.page || 'General').trim() || 'General';
+    const itemSection = String(item.section || 'General').trim() || 'General';
+    const pageMatch = !targetPage || itemPage.toLowerCase() === targetPage.toLowerCase() || itemPage.toLowerCase().includes(targetPage.toLowerCase()) || targetPage.toLowerCase().includes(itemPage.toLowerCase());
+    const sectionMatch = !targetSection || targetSection.toLowerCase() === 'general' || itemSection.toLowerCase() === targetSection.toLowerCase() || itemSection.toLowerCase().includes(targetSection.toLowerCase()) || targetSection.toLowerCase().includes(itemSection.toLowerCase());
+    return pageMatch && sectionMatch;
+  });
+
+  const imageUrls = matches.map((item) => item.imageUrl || item.url || item.src || '').filter(Boolean);
+  if (imageUrls.length) {
+    const idx = Math.abs(Number(index) || 0) % imageUrls.length;
+    return imageUrls[idx];
+  }
+
+  return fallback || '';
+};
 
 const isBlockedRemoteImage = (src = '') => {
   if (!src || typeof src !== 'string') return true;
@@ -196,6 +275,14 @@ export const resolveUniquePropertyImage = (property = {}, section = 'properties'
     : normalizedType.includes('room') ? 'room'
     : normalizedType.includes('hostel') ? 'hostel'
     : '';
+
+  const catalogKey = normalizeCatalogKey(categoryKey || textType || 'OTHER');
+  const catalogList = (catalogImageCache[catalogKey] || []).filter((src) => typeof src === 'string' && src.trim().length > 0);
+  if (catalogList.length) {
+    const desiredIndex = Number.isFinite(Number(property?.imageIndex)) ? Number(property.imageIndex) : Number(index) || 0;
+    const safeIndex = ((desiredIndex % catalogList.length) + catalogList.length) % catalogList.length;
+    return catalogList[safeIndex];
+  }
 
   if (categoryKey && Array.isArray(PROVIDED_CATEGORY_IMAGES[categoryKey]) && PROVIDED_CATEGORY_IMAGES[categoryKey].length) {
     const desiredIndex = Number.isFinite(Number(property?.imageIndex)) ? Number(property.imageIndex) : Number(index) || 0;

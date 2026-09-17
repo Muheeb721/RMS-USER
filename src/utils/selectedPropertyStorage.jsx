@@ -1,30 +1,96 @@
 import apiClient from '../services/apiClient';
 
+const PREF_KEY = 'rms_selected_property';
+
+const getLocalSelectedProperty = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(PREF_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const setLocalSelectedProperty = (obj) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (obj && typeof obj === 'object') {
+      window.localStorage.setItem(PREF_KEY, JSON.stringify(obj));
+    } else {
+      window.localStorage.removeItem(PREF_KEY);
+    }
+  } catch (e) {
+    // ignore storage failures
+  }
+};
+
+const hasAuthenticatedSession = () => {
+  if (typeof window === 'undefined') return false;
+  const token = window.__RMS_AUTH_TOKEN || window.__rms_inmemory_token || window.localStorage.getItem('rms_token') || '';
+  const session = window.localStorage.getItem('rms_auth_session');
+  return Boolean(token || session);
+};
+
 export async function saveSelectedProperty(obj) {
+  setLocalSelectedProperty(obj);
+
+  if (!hasAuthenticatedSession()) {
+    return obj || null;
+  }
+
   try {
     const res = await apiClient.put('/users/profile', { profile: { selectedProperty: obj } });
-    return res?.data?.success ? res.data.data?.profile || null : null;
+    return res?.data?.success ? res.data.data?.profile || null : obj || null;
   } catch (e) {
+    if (e?.response?.status === 401) {
+      return obj || null;
+    }
     console.error('saveSelectedProperty failed', e);
-    return null;
+    return obj || null;
   }
 }
 
 export async function readSelectedProperty() {
+  const localValue = getLocalSelectedProperty();
+
+  if (!hasAuthenticatedSession()) {
+    return localValue;
+  }
+
   try {
     const res = await apiClient.get('/users/profile');
-    return res?.data?.success ? res.data.data?.profile?.selectedProperty || null : null;
+    const profileValue = res?.data?.success ? res.data.data?.profile?.selectedProperty || null : null;
+    if (profileValue) {
+      setLocalSelectedProperty(profileValue);
+      return profileValue;
+    }
+    return localValue;
   } catch (e) {
+    if (e?.response?.status === 401) {
+      return localValue;
+    }
     console.error('readSelectedProperty failed', e);
-    return null;
+    return localValue;
   }
 }
 
 export async function clearSelectedProperty() {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem(PREF_KEY);
+  }
+
+  if (!hasAuthenticatedSession()) {
+    return true;
+  }
+
   try {
     const res = await apiClient.put('/users/profile', { profile: {} });
     return res?.data?.success ? true : false;
   } catch (e) {
+    if (e?.response?.status === 401) {
+      return true;
+    }
     console.error('clearSelectedProperty failed', e);
     return false;
   }

@@ -28,16 +28,17 @@ import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import { hostelData, popularAreas, stats, reviews, propertyData } from "../data/dummyData";
+import apiClient from '../services/apiClient';
 import { useProperties } from "../contexts/PropertyContext";
+import { useAuth } from '../contexts/AuthContext';
 import FavoriteToggle from '../components/FavoriteToggle';
 import "./HomePage.css";
 import "./home-redesign.css";
 import HeroSection from '../components/home/HeroSection';
 import PropertySearch from '../components/home/PropertySearch';
-import FeaturedProperties from '../components/home/FeaturedProperties';
 import WhyChooseRMS from '../components/home/WhyChooseRMS';
 import HowItWorks from '../components/home/HowItWorks';
-import HomeCTA from '../components/home/HomeCTA';
+// HomeCTA removed from HomePage to match requested layout
 import HomeFooter from '../components/home/HomeFooter';
 import ActionModal from "../components/ActionModal";
 import { toast } from "react-toastify";
@@ -50,10 +51,13 @@ import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 function HomePage() {
   const [selectedListing, setSelectedListing] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState("");
+  const [catalogImages, setCatalogImages] = useState({ HOME: [], HOUSE: [], FLAT: [], APARTMENT: [], PROPERTY: [], DEMO: [] });
   // removed inline dashboard UI/state from Home page
   const navigate = useNavigate();
   const { properties } = useProperties();
   const { user } = useSelector((state) => state.auth || {});
+  const { isAuthenticated } = useAuth();
+  const isLoggedIn = Boolean(isAuthenticated || user?.isLoggedIn || user?.email);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -65,6 +69,16 @@ function HomePage() {
       try {
         const service = await import('../services/propertyService');
         await service.listProperties();
+
+        const response = await apiClient.get('/images');
+        if (mounted && response?.data?.success) {
+          const grouped = { HOME: [], HOUSE: [], FLAT: [], APARTMENT: [], PROPERTY: [], DEMO: [] };
+          for (const item of response.data.data || []) {
+            const key = String(item.category || 'OTHER').toUpperCase();
+            if (grouped[key]) grouped[key].push(item);
+          }
+          setCatalogImages(grouped);
+        }
       } catch (e) {
         console.warn('HomePage property load failed', e);
         if (mounted) setError('Unable to load properties');
@@ -84,47 +98,74 @@ function HomePage() {
 
   const normalizePropertyType = (property) => String(property?.type || property?.propertyType || property?.category || '').trim();
 
-  // Homepage curated DHA property imagery
-  const HOME_VIP_HOUSES = [
-    'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600573472592-401b489a3cdc?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=1200&q=80',
-  ];
+  const HOME_VIP_HOUSES = catalogImages.HOUSE.length
+    ? catalogImages.HOUSE.map((item) => item.imageUrl).filter(Boolean)
+    : [
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600573472592-401b489a3cdc?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=1200&q=80',
+      ];
 
-  const HOME_FLATS_INTERIOR = [
-    'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1502005229762-ee1b2b93e0f5?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
-  ];
+  const HOME_FLATS_INTERIOR = catalogImages.FLAT.length
+    ? catalogImages.FLAT.map((item) => item.imageUrl).filter(Boolean)
+    : [
+        'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1502005229762-ee1b2b93e0f5?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
+      ];
 
-  const HOME_APARTMENTS_BUILDINGS = [
-    'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1515263487990-61b07816b324?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1502005096674-719299666c97?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1512915922686-57c11dde9b6b?auto=format&fit=crop&w=1200&q=80',
-    'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80',
-  ];
+  const HOME_APARTMENTS_BUILDINGS = catalogImages.APARTMENT.length
+    ? catalogImages.APARTMENT.map((item) => item.imageUrl).filter(Boolean)
+    : [
+        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1515263487990-61b07816b324?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1502005096674-719299666c97?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1512915922686-57c11dde9b6b?auto=format&fit=crop&w=1200&q=80',
+        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80',
+      ];
 
-  const baseProperties = Array.isArray(properties) && properties.length > 0 ? properties : propertyData;
+  const rawBaseProperties = Array.isArray(properties) && properties.length > 0 ? properties : [];
+  const [areas, setAreas] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await apiClient.get('/areas');
+        if (mounted && res && Array.isArray(res.data)) setAreas(res.data.map(a => a.name));
+      } catch (e) {
+        // keep fallback popularAreas
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+  const isDemoProperty = (p) => {
+    if (!p) return false;
+    const title = String(p.title || p.name || '').toLowerCase();
+    if (title.includes('demo') || title.includes('demo prop') || title.includes('prop-demo')) return true;
+    if (String(p.ownerId || '').toLowerCase() === 'demo-seed') return true;
+    return false;
+  };
+  const baseProperties = rawBaseProperties.filter(p => !isDemoProperty(p));
   const getCategoryProperties = (categoryName) => {
     const normalizedCategory = categoryName.toLowerCase();
     const matches = baseProperties.filter((property) => {
@@ -160,14 +201,42 @@ function HomePage() {
   };
 
   const handleRentProperty = async (property) => {
+    const id = property?.id || property?._id || '';
+    const rentRoute = `/rental-application${id ? `?propertyId=${encodeURIComponent(id)}` : ''}`;
+
+    if (!isLoggedIn) {
+      try {
+        const m = await import('../utils/selectedPropertyStorage.jsx');
+        await m.saveSelectedProperty(property);
+      } catch (e) {
+        console.warn('Unable to persist selected property before redirect', e);
+      }
+
+      try {
+        const authRedirect = await import('../utils/authRedirect');
+        authRedirect.default?.savePendingAction?.({
+          action: 'RENT_NOW',
+          propertyId: id,
+          propertyType: property?.type || property?.propertyType || '',
+          propertyTitle: property?.title || property?.name || '',
+          returnRoute: rentRoute,
+        });
+      } catch (e) {
+        console.warn('Unable to save pending action for rent redirect', e);
+      }
+
+      navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
+      return;
+    }
+
     try {
       const m = await import('../utils/selectedPropertyStorage.jsx');
       await m.saveSelectedProperty(property);
     } catch (e) {
       console.warn('Unable to persist selected property, falling back to navigation', e);
     }
-    const id = property?.id || property?._id || '';
-    navigate(`/rental-application${id ? `?propertyId=${encodeURIComponent(id)}` : ''}`);
+
+    navigate(rentRoute);
   };
 
   const getCardPriceText = (property, blockTitle = '') => {
@@ -270,62 +339,15 @@ function HomePage() {
         </div>
       </motion.div>
 
-      <section className="section-card home-featured-section">
-        <div className="section-header">
-          <div>
-            <h3 className="section-title">Featured Houses</h3>
-            <p className="section-sub">Curated premium homes with distinct, property-specific imagery.</p>
-          </div>
-          <Link to="/properties?type=House" className="btn-ghost">Browse all houses</Link>
-        </div>
-
-        <Row gutter={[20, 20]} style={{ marginTop: 12 }}>
-          {(featuredHouseProperties.length ? featuredHouseProperties : houseProperties).map((property, index) => (
-            <Col xs={24} md={12} lg={8} key={property.id || property.title}>
-              <Card className="home-feature-card" cover={
-                <div className="home-feature-image">
-                  <img
-                    alt={property.title}
-                    src={HOME_VIP_HOUSES[index] || resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE}
-                    loading="lazy"
-                    style={{ width: '100%', height: 260, objectFit: 'cover' }}
-                    onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}
-                  />
-                </div>
-              }>
-                <div className="card-body">
-                  <div className="card-top-row">
-                    <Tag color="gold">{property.floors || '2 Storey'}</Tag>
-                    <span className="card-price">{property.price || property.rentPrice || 'Contact'}</span>
-                  </div>
-                  <div className="card-title">{property.title}</div>
-                  <div className="card-address">{property.address || property.location}</div>
-                  <div className="meta-row">
-                    <span className="meta-pill">{property.bedrooms || 0} Bedrooms</span>
-                    <span className="meta-pill">{property.bathrooms || 0} Bathrooms</span>
-                    <span className="meta-pill">{property.area || 'Area'}</span>
-                  </div>
-                  <div className="card-actions home-card-action">
-                    <Button type="default" onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
-                    <Button type="primary" onClick={() => handleContactProperty(property, 'sale')}>Buy Now</Button>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </section>
-
       {renderCategoryShowcase('Houses', houseProperties, '#d97706')}
       {renderCategoryShowcase('Apartments', apartmentProperties, '#0ea5e9')}
       {renderCategoryShowcase('Flats', flatProperties, '#14b8a6', 'FOR RENT')}
 
       <WhyChooseRMS />
       <HowItWorks />
-      <HomeCTA />
       <HomeFooter />
 
-      {properties.filter(p => p.transactionType === 'Rent').length > 0 && (
+      {baseProperties.filter(p => p.transactionType === 'Rent').length > 0 && (
         <section className="section-card section-spacing">
           <div className="section-header">
             <div>
@@ -336,7 +358,7 @@ function HomePage() {
           </div>
 
           <Row gutter={[16,16]} style={{ marginTop: 8 }}>
-            {properties.filter(p => p.transactionType === 'Rent').slice(0,4).map((property, index) => (
+            {baseProperties.filter(p => p.transactionType === 'Rent').slice(0,4).map((property, index) => (
               <Col xs={24} md={12} lg={6} key={property.id}>
                 <Card cover={<img alt={property.title} src={resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE} style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />} className="property-card">
                   <div className="card-body">
@@ -458,15 +480,16 @@ function HomePage() {
           </div>
         </div>
         <div className="area-tags">
-          {popularAreas.map((area) => (
-            <Link
-              key={area}
-              to={`/properties?area=${encodeURIComponent(area)}`}
-              className="area-tag"
-            >
-              {area}
-            </Link>
-          ))}
+          {/** dynamic areas from API (fallback to popularAreas) */}
+          {Array.isArray(areas) && areas.length > 0 ? (
+            areas.map((area) => (
+              <Link key={area} to={`/properties?area=${encodeURIComponent(area)}`} className="area-tag">{area}</Link>
+            ))
+          ) : (
+            popularAreas.map((area) => (
+              <Link key={area} to={`/properties?area=${encodeURIComponent(area)}`} className="area-tag">{area}</Link>
+            ))
+          )}
         </div>
       </section>
 

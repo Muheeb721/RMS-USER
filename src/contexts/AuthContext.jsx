@@ -63,8 +63,28 @@ export function AuthProvider({ children }) {
       isLoggedIn: true,
     };
 
+    const resolvedToken = authToken || token || '';
     setUser(normalizedUser);
-    setToken(authToken || token || '');
+    setToken(resolvedToken);
+
+    if (typeof window !== 'undefined') {
+      try {
+        if (resolvedToken) {
+          window.__RMS_AUTH_TOKEN = resolvedToken;
+          window.__rms_inmemory_token = resolvedToken;
+          window.localStorage.setItem('rms_token', resolvedToken);
+          if (['admin', 'owner', 'manager'].includes(normalizeRole(normalizedUser.role))) {
+            window.localStorage.setItem('rms_admin_token', resolvedToken);
+          }
+        }
+        const sessionPayload = JSON.stringify(normalizedUser || {});
+        window.localStorage.setItem('rms_auth_session', sessionPayload);
+        window.localStorage.setItem('rms_user_role', normalizedUser.role || 'resident');
+      } catch (e) {
+        // ignore session storage issues
+      }
+    }
+
     return normalizedUser;
   };
 

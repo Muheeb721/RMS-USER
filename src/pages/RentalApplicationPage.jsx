@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, DatePicker, Select, InputNumber, Row, Col, Button, Checkbox, Card, Modal, Typography } from 'antd';
+import { Form, Input, DatePicker, Select, InputNumber, Row, Col, Button, Checkbox, Card, Modal, Typography, Spin, Alert } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import bookingService from '../services/bookingService';
 import propertyService from '../services/propertyService';
+import api from '../services/api';
 import selectedPropertyStorage from '../utils/selectedPropertyStorage.jsx';
 import { toast } from 'react-toastify';
 
 const { Title, Text } = Typography;
+
+// Utility function to validate MongoDB ObjectId format
+const isValidMongoObjectId = (id) => {
+  if (!id || typeof id !== 'string') return false;
+  return /^[0-9a-fA-F]{24}$/.test(id);
+};
 
 function RentalApplicationPage() {
   const [form] = Form.useForm();
@@ -17,34 +24,84 @@ function RentalApplicationPage() {
   const [property, setProperty] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [successData, setSuccessData] = useState(null);
+  const [profileReady, setProfileReady] = useState(false);
+  const [propertyError, setPropertyError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      // try selectedProperty from profile
+      const sessionUser = user || {};
+      if (!sessionUser.id && !sessionUser.email) {
+        const target = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
+        navigate(`/login?redirect=${target}`, { replace: true });
+        return;
+      }
+
+      try {
+        const profileRes = await api.request('/tenant-profiles/me');
+        if (mounted && profileRes && profileRes.success && profileRes.data) {
+          setProfileReady(true);
+        } else if (mounted) {
+          const propertyId = searchParams.get('propertyId');
+          const returnTo = `${window.location.pathname}${window.location.search}`;
+          const target = propertyId
+            ? `/tenant-profile?propertyId=${encodeURIComponent(propertyId)}&returnTo=${encodeURIComponent(returnTo)}`
+            : `/tenant-profile?returnTo=${encodeURIComponent(returnTo)}`;
+          navigate(target, { replace: true });
+          return;
+        }
+      } catch (error) {
+        if (mounted) {
+          const propertyId = searchParams.get('propertyId');
+          const returnTo = `${window.location.pathname}${window.location.search}`;
+          const target = propertyId
+            ? `/tenant-profile?propertyId=${encodeURIComponent(propertyId)}&returnTo=${encodeURIComponent(returnTo)}`
+            : `/tenant-profile?returnTo=${encodeURIComponent(returnTo)}`;
+          navigate(target, { replace: true });
+          return;
+        }
+      }
+
       const sp = await selectedPropertyStorage.readSelectedProperty().catch(() => null);
       if (mounted && sp) {
         setProperty(sp);
+        setPropertyError(null);
         form.setFieldsValue({ propertyTitle: sp.title, propertyId: sp.id || sp._id, propertyType: sp.type || sp.propertyType, rent: sp.rent || sp.price || 0 });
         return;
       }
 
       const propId = searchParams.get('propertyId');
       if (propId) {
+        // Validate that the property ID is a valid MongoDB ObjectId
+        if (!isValidMongoObjectId(propId)) {
+          if (mounted) {
+            setPropertyError(`Invalid property ID format: "${propId}". Property ID must be a valid 24-character identifier.`);
+            console.warn('Invalid property ID format:', propId);
+          }
+          return;
+        }
+
         try {
           const res = await propertyService.getPropertyById(propId);
-          if (res && res.success && res.data) {
+          if (mounted && res && res.success && res.data) {
             const p = res.data;
             setProperty(p);
+            setPropertyError(null);
             form.setFieldsValue({ propertyTitle: p.title, propertyId: p._id || p.id, propertyType: p.propertyType || p.type, rent: p.rent || p.price || 0 });
+          } else if (mounted) {
+            setPropertyError(`Unable to load property: ${res?.message || 'Property not found'}`);
+            console.warn('Unable to load property', res?.message);
           }
         } catch (e) {
-          console.warn('Unable to load property', e);
+          if (mounted) {
+            setPropertyError(`Error loading property: ${e.message}`);
+            console.warn('Unable to load property', e);
+          }
         }
       }
     })();
     return () => { mounted = false; };
-  }, [searchParams]);
+  }, [searchParams, navigate, user, form]);
 
   useEffect(() => {
     form.setFieldsValue({ fullName: user.name || '', email: user.email || '' });
@@ -73,6 +130,15 @@ function RentalApplicationPage() {
         return;
       }
 
+      const finalPropertyId = values.propertyId || (property && (property._id || property.id));
+      
+      // Validate property ID before submission
+      if (!finalPropertyId || !isValidMongoObjectId(String(finalPropertyId))) {
+        toast.error('Invalid property ID. Please ensure a valid property has been selected.');
+        setSubmitting(false);
+        return;
+      }
+
       const payload = {
         // user info
         userId: user.id || user.email || null,
@@ -80,7 +146,7 @@ function RentalApplicationPage() {
         userEmail: values.email,
         userPhone: values.phone,
         // property
-        propertyId: values.propertyId || (property && (property._id || property.id)),
+        propertyId: finalPropertyId,
         propertyTitle: values.propertyTitle || (property && property.title),
         propertyType: values.propertyType || (property && (property.propertyType || property.type)),
         rent: Number(values.rent || 0),
@@ -136,6 +202,14 @@ function RentalApplicationPage() {
     }
   };
 
+  if (!profileReady) {
+    return (
+      <div className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
+        <Spin size="large" tip="Checking your rental profile..." />
+      </div>
+    );
+  }
+
   return (
     <div className="page-shell">
       <section className="section-card">
@@ -143,6 +217,17 @@ function RentalApplicationPage() {
           <Col xs={24} lg={16}>
             <Card>
               <Title level={4}>{isPurchase(property) ? 'Purchase Application' : 'Rental Application'}</Title>
+              
+              {propertyError && (
+                <Alert 
+                  message="Property Error" 
+                  description={propertyError} 
+                  type="error" 
+                  showIcon 
+                  style={{ marginBottom: 16 }} 
+                />
+              )}
+
               <Form form={form} layout="vertical" onFinish={handleFinish}>
                 <Title level={5}>Personal Information</Title>
                 <Row gutter={12}>

@@ -718,20 +718,11 @@ export const hostelData = [
 ];
 
 export const popularAreas = [
-  'DHA Lahore',
-  'Bahria Town Lahore',
-  'Johar Town',
-  'Gulberg',
-  'Model Town',
-  'Valencia Town',
-  'Wapda Town',
-  'Askari',
-  'Township',
-  'Faisal Town',
-  'Garden Town',
-  'Iqbal Town',
-  'Muslim Town',
-  'Canal View'
+  'DHA Phase 7',
+  'DHA Phase 6',
+  'DHA Phase 8',
+  'DHA Phase 9',
+  'DHA Phase 11'
 ];
 
 export const stats = [

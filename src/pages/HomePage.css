@@ -270,9 +270,14 @@
   padding: 20px 18px 18px;
 }
 .card-title {
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .card-top-row {
   display: flex;
@@ -292,9 +297,9 @@
   border: none;
 }
 .card-price {
-  font-weight: 800;
+  font-weight: 700;
   color: var(--green-500);
-  font-size: 2.2rem;
+  font-size: 1.05rem;
   line-height: 1;
 }
 .meta-row {
@@ -304,11 +309,11 @@
   margin-top: 12px;
 }
 .meta-pill {
-  padding: 7px 12px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: #f1f5f9;
   color: #4b5563;
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 600;
 }
 .card-actions {
@@ -344,7 +349,13 @@
 .review-role,
 .benefit-text {
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.4;
+  font-size: 0.92rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .area-tags {
   display: flex;

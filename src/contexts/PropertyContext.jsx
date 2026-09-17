@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { propertyData as initialPropertyData } from "../data/dummyData";
 import propertyService from '../services/propertyService';
 import { recordDashboardSubmission } from '../utils/dashboardSubmissionStorage.jsx';
 import { add as addPriceHistory } from '../utils/priceHistoryStorage.jsx';
@@ -187,9 +186,9 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
 };
 
 const getInitialProperties = () => {
-  // start with local fallback so UI remains functional until API responds
-  const usedImages = new Set();
-  return initialPropertyData.map((item, index) => normalizeProperty(item, index + 1, usedImages));
+  // The backend is the source of truth for live listings.
+  // Do not populate property listings from dummy data in production flows.
+  return [];
 };
 
 const decodeTokenPayload = () => {
@@ -219,18 +218,26 @@ export function PropertyProvider({ children }) {
   // fetch properties from backend on mount, replacing local data when available
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    const loadProperties = async () => {
       try {
         const res = await propertyService.listProperties();
         if (mounted && res && res.success && Array.isArray(res.data)) {
           const usedImages = new Set();
           setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1, usedImages)));
+        } else if (mounted) {
+          setProperties([]);
         }
       } catch (e) {
-        // keep fallback local data
+        if (mounted) {
+          console.warn('Property listing load failed; leaving data empty until backend is reachable.', e);
+          setProperties([]);
+        }
       }
-    })();
-    return () => { mounted = false; };
+    };
+
+    loadProperties();
+    const timer = window.setInterval(loadProperties, 20000);
+    return () => { mounted = false; window.clearInterval(timer); };
   }, []);
 
   const value = useMemo(

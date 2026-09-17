@@ -12,6 +12,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import "./ServicesPage.css";
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
+import { resolveCatalogPageImage } from '../utils/propertyImageCatalog';
 
 const artForService = (label, firstColor, secondColor) => {
   const safeLabel = String(label || 'RMS').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -67,7 +68,10 @@ const serviceItems = [
     highlights: [ ],
     color: "#0c4a6e",
   },
-];
+].map((item, index) => ({
+  ...item,
+  image: resolveCatalogPageImage('Services Page', item.badge, index, item.image),
+}));
 
 const metrics = [
   {

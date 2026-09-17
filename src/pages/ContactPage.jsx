@@ -10,6 +10,7 @@ import { add as addContactRequest } from "../utils/contactRequestsStorage.jsx";
 import { sanitizeFullName } from "../utils/nameValidation.jsx";
 import api from "../services/api.js";
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
+import { resolveCatalogPageImage } from '../utils/propertyImageCatalog';
 import {
   readSelectedProperty,
   clearSelectedProperty,
@@ -358,7 +359,7 @@ function ContactPage() {
         </div>
         <div className="hero-visual">
           <img
-            src="https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80"
+            src={resolveCatalogPageImage('Contact Page', 'Hero', 0, 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80')}
             alt="Modern residential property"
             style={{ width: '100%', objectFit: 'cover' }}
             onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }}

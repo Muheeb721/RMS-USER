@@ -36,9 +36,9 @@ const log = (...args) => console.log('[E2E-ADMIN]', ...args);
     page.setDefaultTimeout(120000);
     await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
-    // fill form - try robust selectors in case markup differs
-    const emailSel = 'input[placeholder="Enter your email"]' ;
-    const passSel = 'input[placeholder="Enter your password"]' ;
+    // fill form - use robust selectors matching current LoginPage
+    const emailSel = 'input[type="email"]';
+    const passSel = 'input[type="password"]';
     const submitSel = 'button[type="submit"]';
     await page.waitForSelector(emailSel, { timeout: 15000 });
     await page.fill(emailSel, 'admin@rms.com');

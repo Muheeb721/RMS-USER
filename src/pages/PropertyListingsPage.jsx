@@ -17,6 +17,7 @@ import { toast } from 'react-toastify';
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { getPrimaryImage } from '../utils/imageUtils';
 import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
+import authRedirect from '../utils/authRedirect';
 
 const { Paragraph } = Typography;
 
@@ -95,8 +96,15 @@ function PropertyListingsPage() {
     setInquiryOpen(true);
   };
 
-  const handleProtectedNavigation = (targetUrl) => {
+  const handleProtectedNavigation = (targetUrl, action = 'GENERAL_ACTION', item = null) => {
     if (!user?.isLoggedIn) {
+      authRedirect.savePendingAction({
+        action,
+        propertyId: item?.id || item?._id || '',
+        propertyType: item?.type || item?.propertyType || '',
+        propertyTitle: item?.title || item?.name || '',
+        returnRoute: targetUrl,
+      });
       navigate(`/login?redirect=${encodeURIComponent(targetUrl)}`);
       return;
     }
@@ -324,14 +332,22 @@ function PropertyListingsPage() {
                         <img alt={property.title} src={cardImage} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
                         <div className="cover-actions">
                           <Button type="primary" icon={<EyeOutlined />} onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/properties/${property.id}`); }}>View</Button>
-                          <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`); }}>Contact</Button>
+                          <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`, 'CONTACT_PROPERTY', property); }}>Contact</Button>
                           {property.transactionType === 'Rent' && (
                             <Button
                               type="primary"
                               style={{ background: '#28b463', borderColor: '#28b463' }}
                               onClick={async () => {
                                 if (!user?.isLoggedIn) {
-                                  navigate(`/login?redirect=${encodeURIComponent(`/rental-application?propertyId=${property.id}`)}`);
+                                  const rentRoute = `/rental-application?propertyId=${encodeURIComponent(property.id)}`;
+                                  authRedirect.savePendingAction({
+                                    action: 'RENT_NOW',
+                                    propertyId: property.id || property._id || '',
+                                    propertyType: property.type || property.propertyType || '',
+                                    propertyTitle: property.title || property.name || '',
+                                    returnRoute: rentRoute,
+                                  });
+                                  navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
                                   return;
                                 }
                                 try {

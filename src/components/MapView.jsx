@@ -9,10 +9,9 @@ const defaultIcon = L.icon({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
   iconSize: [25, 41],
-  iconAnchor: [12, 41]
+  iconAnchor: [12, 41],
+  popupAnchor: [0, -30],
 });
-
-L.Marker.prototype.options.icon = defaultIcon;
 
 function MapView({ selectedArea = 'All Areas' }) {
   const filteredProperties = selectedArea && selectedArea !== 'All Areas'
@@ -39,18 +38,18 @@ function MapView({ selectedArea = 'All Areas' }) {
 
   return (
     <div className="map-shell">
-      <MapContainer center={mapCenter} zoom={11} scrollWheelZoom>
+      <MapContainer center={mapCenter} zoom={11} scrollWheelZoom style={{ height: '100%', width: '100%', minHeight: 240 }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         {propertiesWithCoords.map((property) => (
-          <Marker key={property.id} position={[property.lat, property.lng]}>
+          <Marker key={property.id} position={[property.lat, property.lng]} icon={defaultIcon}>
             <Popup>{property.title} · {property.area}</Popup>
           </Marker>
         ))}
         {hostelsWithCoords.map((hostel) => (
-          <Marker key={hostel.id} position={[hostel.lat, hostel.lng]}>
+          <Marker key={hostel.id} position={[hostel.lat, hostel.lng]} icon={defaultIcon}>
             <Popup>{hostel.title} · {hostel.area}</Popup>
           </Marker>
         ))}

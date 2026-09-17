@@ -23,6 +23,7 @@ const SavedSearchesPage = lazy(() => import('../pages/SavedSearchesPage'));
 const AIRecommendationsPage = lazy(() => import('../pages/AIRecommendationsPage'));
 const BookingsPage = lazy(() => import('../pages/BookingsPage'));
 const RentalApplicationPage = lazy(() => import('../pages/RentalApplicationPage'));
+const TenantProfilePage = lazy(() => import('../pages/TenantProfilePage'));
 const HostelListingsPage = lazy(() => import('../pages/HostelListingsPage'));
 const HostelDetailsPage = lazy(() => import('../pages/HostelDetailsPage'));
 const UserDashboardPage = lazy(() => import('../pages/UserDashboardPage'));
@@ -69,24 +70,25 @@ function AppRoutes() {
           <Route path="/compare" element={<ComparePage />} />
           <Route path="/saved-searches" element={<SavedSearchesPage />} />
           <Route path="/ai-recommendations" element={<AIRecommendationsPage />} />
-          <Route path="/bookings" element={<BookingsPage />} />
-          <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/properties/:id" element={<PropertyDetailsPage />} />
-          <Route path="/rental-application" element={<RentalApplicationPage />} />
           <Route path="/hostels" element={<HostelListingsPage />} />
           <Route path="/hostels/:id" element={<HostelDetailsPage />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/notifications" element={<NotificationsErrorBoundary><NotificationsPage /></NotificationsErrorBoundary>} />
-          <Route path="/payments" element={<PaymentsPage />} />
-          <Route path="/my-rent" element={<MyRentPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>
-            <Route path="/dashboard" element={<ErrorBoundary><UserDashboardPage /></ErrorBoundary>} />
+          <Route path="/dashboard" element={<ErrorBoundary><UserDashboardPage /></ErrorBoundary>} />
+          <Route path="/bookings" element={<BookingsPage />} />
+          <Route path="/maintenance" element={<MaintenancePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/rent-management" element={<RentManagementPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/dues" element={<ResidentDuesPage />} />
+          <Route path="/rental-application" element={<RentalApplicationPage />} />
+          <Route path="/tenant-profile" element={<TenantProfilePage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/notifications" element={<NotificationsErrorBoundary><NotificationsPage /></NotificationsErrorBoundary>} />
+          <Route path="/payments" element={<PaymentsPage />} />
+          <Route path="/my-rent" element={<MyRentPage />} />
         </Route>
 
         <Route element={<AdminRoute />}>

@@ -19,6 +19,7 @@ import { sanitizeFullName } from "../utils/nameValidation";
 import api from "../services/api";
 import "./ProfilePage.css";
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
+import { resolveCatalogPageImage } from '../utils/propertyImageCatalog';
 
 const defaultProfile = {
   name: "Muheeb ullah",
@@ -155,6 +156,7 @@ function ProfilePage() {
   };
 
   const initials = "RMS";
+  const profileBannerImage = resolveCatalogPageImage('Profile Page', 'Banner', 0, 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80');
   const { properties } = useProperties();
 
   const favoriteItems = useMemo(() => {
@@ -198,7 +200,14 @@ function ProfilePage() {
         transition={{ duration: 0.45 }}
       >
         <aside className="profile-sidebar">
-          <Card className="profile-card profile-avatar-card">
+          <Card
+            className="profile-card profile-avatar-card"
+            style={{
+              backgroundImage: `linear-gradient(180deg, rgba(10, 24, 42, 0.18), rgba(10, 24, 42, 0.06)), url(${profileBannerImage})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
             <div className="profile-avatar-upload">
               <div className="profile-avatar" onClick={triggerFileChoose} role="button" tabIndex={0}>
                 {editing && draft.image ? (

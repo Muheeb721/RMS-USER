@@ -9,6 +9,8 @@ import { createLoginNotification, saveSessionUser } from '../services/notificati
 import authService from '../services/authService';
 import { useAuth } from '../contexts/AuthContext';
 import { sanitizeFullName } from '../utils/nameValidation.jsx';
+import { resolveCatalogPageImage } from '../utils/propertyImageCatalog';
+import authRedirect from '../utils/authRedirect';
 import './LoginPage.css';
 
 const REMEMBERED_EMAIL_KEY = 'rms_remembered_email';
@@ -47,7 +49,14 @@ function LoginPage() {
   const redirectPath = (() => {
     const params = new URLSearchParams(location.search);
     const target = params.get('redirect');
-    return target && target.startsWith('/') ? target : '/';
+    if (!target) return '/';
+
+    try {
+      const decoded = decodeURIComponent(target);
+      return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/';
+    } catch (error) {
+      return '/';
+    }
   })();
 
   useEffect(() => {
@@ -98,6 +107,7 @@ function LoginPage() {
   }, [form, navigate]);
 
   const { login: authLogin } = useAuth();
+  const loginHeroImage = resolveCatalogPageImage('Login Page', 'Hero', 0, 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1400&q=80');
 
   const handleSubmit = async (values) => {
     setLoading(true);
@@ -191,8 +201,13 @@ function LoginPage() {
       dispatch(addNotification(createLoginNotification(sessionUser)));
       form.resetFields();
       toast.success(`Welcome back, ${sessionUser.name}!`);
-      const nextRoute = resolveDashboardRoute(sessionUser.role, redirectPath);
-      navigate(nextRoute, { replace: true });
+      const pendingAction = authRedirect.consumePendingAction();
+      const resolvedRedirect = redirectPath && redirectPath !== '/login' && redirectPath !== '/signup' && redirectPath !== '/register'
+        ? redirectPath
+        : resolveDashboardRoute(sessionUser.role, '/dashboard');
+      const finalRedirect = pendingAction?.returnRoute || resolvedRedirect;
+
+      navigate(finalRedirect, { replace: true });
     } catch (error) {
       console.error('Login error', error);
       toast.error('Login failed — please check your credentials or try again later.');
@@ -203,7 +218,14 @@ function LoginPage() {
 
   return (
     <div className="auth-shell">
-      <section className="auth-panel auth-panel--hero">
+      <section
+        className="auth-panel auth-panel--hero"
+        style={{
+          backgroundImage: `linear-gradient(135deg, rgba(4, 18, 37, 0.92) 0%, rgba(10, 38, 69, 0.86) 100%), url(${loginHeroImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
         <div className="auth-brand">
           <div className="auth-brand__mark">R</div>
           <span>RMS</span>

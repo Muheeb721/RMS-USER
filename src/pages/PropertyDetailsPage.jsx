@@ -15,6 +15,7 @@ import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { increment as incrementView, getCount as getViewCount } from '../utils/propertyViewsStorage';
 import { isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage';
 import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
+import authRedirect from '../utils/authRedirect';
 const { Text } = Typography;
 import { toast } from 'react-toastify';
 
@@ -251,10 +252,15 @@ function PropertyDetailsPage() {
                   type="primary"
                   onClick={async () => {
                     if (!isAuthenticated) {
-                      const params = new URLSearchParams();
-                      params.set('propertyTitle', property.title || property.name || '');
-                      params.set('propertyType', property.type || property.propertyType || '');
-                      navigate(`/login?redirect=${encodeURIComponent('/contact?' + params.toString())}`);
+                      const target = `/contact?propertyId=${encodeURIComponent(property.id || property._id || '')}&propertyTitle=${encodeURIComponent(property.title || property.name || '')}&propertyType=${encodeURIComponent(property.type || property.propertyType || '')}`;
+                      authRedirect.savePendingAction({
+                        action: 'CONTACT_PROPERTY',
+                        propertyId: property.id || property._id || '',
+                        propertyType: property.type || property.propertyType || '',
+                        propertyTitle: property.title || property.name || '',
+                        returnRoute: target,
+                      });
+                      navigate(`/login?redirect=${encodeURIComponent(target)}`);
                       return;
                     }
 
@@ -276,7 +282,15 @@ function PropertyDetailsPage() {
                     type="primary"
                     onClick={async () => {
                       if (!isAuthenticated) {
-                        navigate(`/login?redirect=${encodeURIComponent(`/rental-application?propertyId=${property.id}`)}`);
+                        const rentRoute = `/rental-application?propertyId=${encodeURIComponent(property.id || property._id || '')}`;
+                        authRedirect.savePendingAction({
+                          action: 'RENT_NOW',
+                          propertyId: property.id || property._id || '',
+                          propertyType: property.type || property.propertyType || '',
+                          propertyTitle: property.title || property.name || '',
+                          returnRoute: rentRoute,
+                        });
+                        navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
                         return;
                       }
                       try {

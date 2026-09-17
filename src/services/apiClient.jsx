@@ -1,28 +1,52 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const apiClient = axios.create({
-  baseURL: '/api',
+export const getStoredAuthToken = () => {
+  if (typeof window === 'undefined') return '';
+
+  const candidates = [
+    window.__RMS_AUTH_TOKEN,
+    window.__rms_inmemory_token,
+    window.localStorage.getItem('rms_token'),
+    window.localStorage.getItem('rms_admin_token'),
+  ];
+
+  for (const value of candidates) {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+};
+
+const apiClient = axios.create({baseURL:
+   import.meta.env.VITE_API_URL || '/api', 
   timeout: 30000,
   withCredentials: true, // send cookies (use secure, HttpOnly cookies on backend when possible)
 });
 
-// Request interceptor: attach auth header from in-memory token if available
+// Request interceptor: attach auth header from any compatible token/session key that has been used across the app
 apiClient.interceptors.request.use(
   (config) => {
-    // If you store a non-HttpOnly token in memory, attach it here.
-    // Prefer HttpOnly secure cookies so the browser sends them automatically.
-    const token = window.__RMS_AUTH_TOKEN || null;
+    const token = getStoredAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      // Development helper: attach local session from localStorage so backend can authenticate in dev/e2e
-      try {
-        const sess = window.localStorage.getItem('rms_auth_session');
-        if (sess) config.headers['x-rms-session'] = sess;
-      } catch (e) {
-        // ignore
+      return config;
+    }
+
+    // Development helper: attach local session from localStorage so backend can authenticate in dev/e2e
+    try {
+      const rawSession = window.localStorage.getItem('rms_auth_session');
+      if (rawSession) {
+        const parsed = JSON.parse(rawSession);
+        const sessionPayload = typeof parsed === 'string' ? parsed : JSON.stringify(parsed);
+        if (sessionPayload) {
+          config.headers['x-rms-session'] = sessionPayload;
+        }
       }
+    } catch (e) {
+      // ignore
     }
     return config;
   },
