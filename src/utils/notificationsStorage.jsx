@@ -85,16 +85,21 @@ export const saveStoredNotifications = (items = []) => {
 export const addStoredNotification = async (note) => {
   try {
     const res = await notificationService.createNotificationOnServer(note);
-    if (res && res.success && res.data) return res.data;
-    // fallback to local in-memory creation
+    if (res && res.success && res.data) return { success: true, data: res.data };
+
     const local = notificationService.createNotification(note);
-    return local;
+    return {
+      success: false,
+      message: res?.message || 'Notification was queued locally because the backend rejected it.',
+      data: local,
+    };
   } catch (e) {
     console.error('addStoredNotification failed', e);
     try {
-      return notificationService.createNotification(note);
+      const local = notificationService.createNotification(note);
+      return { success: false, message: 'Unable to sync notification to the server.', data: local };
     } catch (err) {
-      return null;
+      return { success: false, message: 'Unable to sync notification to the server.', data: null };
     }
   }
 };

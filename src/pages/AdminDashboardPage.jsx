@@ -88,10 +88,21 @@ export default function AdminDashboardPage() {
   const overduePaymentsCount = storedPayments.filter((p) => p.status === 'Overdue').length;
   const totalOutstanding = storedPayments.reduce((s, p) => s + Number(p.remainingAmount || 0), 0);
 
-  const available = properties.filter((p) => (p.status || p.availability) === 'Available').length;
-  const reserved = properties.filter((p) => (p.status || p.availability) === 'Reserved').length;
-  const sold = properties.filter((p) => (p.status || p.availability) === 'Sold').length;
-  const forRent = properties.filter((p) => (p.status || p.availability) === 'For Rent').length;
+  const normalizeStatus = (value) => {
+    const raw = String(value || '').trim();
+    const lowered = raw.toLowerCase();
+    if (!raw || ['available', 'available now', 'ready', 'soon available'].includes(lowered)) return 'Available';
+    if (['booked', 'occupied', 'reserved', 'approved', 'confirmed'].includes(lowered)) return 'Booked';
+    if (['rented', 'leased'].includes(lowered)) return 'Rented';
+    if (['for rent', 'rent'].includes(lowered)) return 'For Rent';
+    if (['sold', 'closed'].includes(lowered)) return 'Sold';
+    return raw;
+  };
+
+  const available = properties.filter((p) => normalizeStatus(p.status || p.availability) === 'Available').length;
+  const reserved = properties.filter((p) => normalizeStatus(p.status || p.availability) === 'Booked').length;
+  const sold = properties.filter((p) => normalizeStatus(p.status || p.availability) === 'Sold').length;
+  const forRent = properties.filter((p) => normalizeStatus(p.status || p.availability) === 'For Rent').length;
   const totalInquiries = inquiries.length;
   const pendingVisits = visits.filter((v) => v.status === 'Pending').length;
   const mostViewedId = Object.entries(views).sort((a, b) => b[1] - a[1])[0]?.[0] || null;

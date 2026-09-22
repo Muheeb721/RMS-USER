@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, Row, Col, Table, Tag, Button, Space } from 'antd';
 import { read, update } from '../services/rentService.jsx';
 import bookingService from '../services/bookingService';
+import applicationService from '../services/applicationService';
 import { useProperties } from '../contexts/PropertyContext';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
@@ -22,7 +23,8 @@ function AdminRentPage() {
     let mounted = true;
     const load = async () => {
       try {
-        const res = await bookingService.listAllBookings();
+        // prefer the new applications endpoint, fall back to bookings
+        const res = await applicationService.listAll().catch(() => null) || await bookingService.listAllBookings();
         if (mounted && res && res.success) setBookings(res.data || []);
       } catch (e) {
         console.error('Unable to load bookings for admin', e);
@@ -58,10 +60,9 @@ function AdminRentPage() {
   const approveBooking = async (b) => {
     try {
       const id = b._id || b.id || b.bookingId;
-      const res = await bookingService.approveBooking(id);
+      const res = await (applicationService.accept(id).catch(() => null) || bookingService.approveBooking(id));
       if (res && res.success) {
-        // refresh bookings
-        const next = await bookingService.listAllBookings();
+        const next = await (applicationService.listAll().catch(() => null) || bookingService.listAllBookings());
         if (next && next.success) setBookings(next.data || []);
       }
     } catch (e) {
@@ -72,9 +73,9 @@ function AdminRentPage() {
   const rejectBooking = async (b) => {
     try {
       const id = b._id || b.id || b.bookingId;
-      const res = await bookingService.rejectBooking(id, { reason: 'Rejected by admin' });
+      const res = await (applicationService.reject(id, 'Rejected by admin').catch(() => null) || bookingService.rejectBooking(id, { reason: 'Rejected by admin' }));
       if (res && res.success) {
-        const next = await bookingService.listAllBookings();
+        const next = await (applicationService.listAll().catch(() => null) || bookingService.listAllBookings());
         if (next && next.success) setBookings(next.data || []);
       }
     } catch (e) {

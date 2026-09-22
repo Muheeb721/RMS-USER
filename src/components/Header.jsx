@@ -7,19 +7,41 @@ import {
   AppstoreOutlined,
   UserOutlined,
   DashboardOutlined,
+  LogoutOutlined,
 } from "@ant-design/icons";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
+import { logout } from "../redux/store";
+import { useAuth } from "../contexts/AuthContext";
 import NotificationBell from "./Notifications/NotificationBell";
 import "../pages/header.css";
 
 const { Header } = Layout;
 
 function HeaderNav() {
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const authContext = useAuth();
   const { theme, user } = useSelector((state) => state.auth);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isLoggedIn = Boolean(user?.isLoggedIn || user?.email);
+
+  const handleLogout = () => {
+    try {
+      authContext?.logout?.();
+    } catch (e) {
+      // ignore
+    }
+    dispatch(logout());
+    window.localStorage.removeItem('rms_auth_session');
+    window.localStorage.removeItem('rms_user_role');
+    window.localStorage.removeItem('rms_token');
+    window.localStorage.removeItem('rms_admin_token');
+    window.localStorage.removeItem('rms_remembered_email');
+    navigate('/login', { replace: true });
+    window.location.replace('/login');
+  };
 
   const navItems = [
     { to: "/", label: "Home", icon: <HomeOutlined /> },
@@ -87,6 +109,10 @@ function HeaderNav() {
                 <UserOutlined />
                 <span>{user?.name ? user.name.split(" ")[0] : "Profile"}</span>
               </Link>
+              <button type="button" className="btn-secondary header-action-btn" onClick={handleLogout}>
+                <LogoutOutlined />
+                <span>Logout</span>
+              </button>
             </>
           ) : (
             <Link to="/login" className="btn-primary header-action-btn">
@@ -123,6 +149,9 @@ function HeaderNav() {
                   <Link to="/profile" className="btn-secondary" onClick={() => setIsMenuOpen(false)}>
                     Profile
                   </Link>
+                  <button type="button" className="btn-secondary" onClick={() => { setIsMenuOpen(false); handleLogout(); }}>
+                    Logout
+                  </button>
                 </>
               ) : (
                 <Link to="/login" className="btn-primary" onClick={() => setIsMenuOpen(false)}>

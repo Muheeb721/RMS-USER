@@ -64,8 +64,32 @@ const normalizeGeneratedImage = (value, type = 'Property', title = 'Property', i
   return value;
 };
 
+const normalizePropertyState = (rawStatus) => {
+  const value = String(rawStatus || '').trim();
+  if (!value) return 'Available';
+  const lowered = value.toLowerCase();
+  if (['available', 'available now', 'ready', 'soon available'].includes(lowered)) return 'Available';
+  if (['booked', 'occupied', 'reserved', 'approved', 'confirmed'].includes(lowered)) return 'Booked';
+  if (['rented', 'leased', 'tenant occupied'].includes(lowered)) return 'Rented';
+  if (['for rent', 'rent'].includes(lowered)) return 'For Rent';
+  if (['sold', 'closed'].includes(lowered)) return 'Sold';
+  if (['rejected', 'cancelled', 'canceled'].includes(lowered)) return 'Available';
+  return value;
+};
+
 const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new Set()) => {
-  const imagesRaw = Array.isArray(item.images) && item.images.length ? item.images : item.image ? [item.image] : [];
+  // Accept both legacy string arrays and new object arrays {url, public_id}
+  let imagesRaw = [];
+  if (Array.isArray(item.images) && item.images.length) {
+    imagesRaw = item.images.map((it) => {
+      if (!it) return null;
+      if (typeof it === 'string') return it;
+      if (typeof it === 'object' && it.url) return it.url;
+      return null;
+    }).filter(Boolean);
+  } else if (item.image) {
+    imagesRaw = [item.image];
+  }
 
   // Generate unique, type-appropriate image arrays when none are provided.
   // Prefer local curated images placed under `/public/images/{category}/` using the
@@ -142,7 +166,7 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
   try { if (usedImages && image) usedImages.add(image); } catch (e) {}
 
   const rawStatus = item.status || item.availability || item.availabilityStatus || 'Available';
-  const normalizedStatus = String(rawStatus).trim();
+  const normalizedStatus = normalizePropertyState(rawStatus);
 
   return {
     id: item._id || item.id || fallbackId,
@@ -218,26 +242,49 @@ export function PropertyProvider({ children }) {
   // fetch properties from backend on mount, replacing local data when available
   useEffect(() => {
     let mounted = true;
+    let timer = null;
+    let backendOffline = false;
+
+    const stopPolling = () => {
+      if (timer) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
+
     const loadProperties = async () => {
       try {
         const res = await propertyService.listProperties();
-        if (mounted && res && res.success && Array.isArray(res.data)) {
+        if (!mounted) return;
+
+        if (res && res.success && Array.isArray(res.data)) {
           const usedImages = new Set();
           setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1, usedImages)));
-        } else if (mounted) {
-          setProperties([]);
+          backendOffline = false;
+          if (!timer) {
+            timer = window.setInterval(loadProperties, 20000);
+          }
+          return;
         }
+
+        backendOffline = true;
+        stopPolling();
+        setProperties([]);
       } catch (e) {
-        if (mounted) {
-          console.warn('Property listing load failed; leaving data empty until backend is reachable.', e);
-          setProperties([]);
-        }
+        if (!mounted) return;
+        console.warn('Property listing load failed; leaving data empty until backend is reachable.', e);
+        backendOffline = true;
+        stopPolling();
+        setProperties([]);
       }
     };
 
     loadProperties();
-    const timer = window.setInterval(loadProperties, 20000);
-    return () => { mounted = false; window.clearInterval(timer); };
+
+    return () => {
+      mounted = false;
+      stopPolling();
+    };
   }, []);
 
   const value = useMemo(
@@ -365,12 +412,24 @@ export function PropertyProvider({ children }) {
         }
       },
       getPropertyViewCount: (id) => getPropertyViewCount(id),
-      deleteProperty: (id) => {
+      deleteProperty: async (id) => {
         if (!isAdminSession()) {
           console.warn('Only admin users can delete property listings.');
-          return;
+          return null;
         }
-        setProperties((prev) => prev.filter((item) => item.id !== id));
+
+        try {
+          const res = await propertyService.deleteProperty?.(id);
+          if (res && res.success) {
+            setProperties((prev) => prev.filter((item) => String(item.id) !== String(id)));
+            return true;
+          }
+        } catch (e) {
+          console.warn('Backend delete failed for property.', e);
+        }
+
+        setProperties((prev) => prev.filter((item) => String(item.id) !== String(id)));
+        return true;
       },
     }),
     [properties],

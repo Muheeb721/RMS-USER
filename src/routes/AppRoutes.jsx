@@ -35,6 +35,7 @@ const MaintenancePage = lazy(() => import('../pages/MaintenancePage'));
 const RentManagementPage = lazy(() => import('../pages/RentManagementPage'));
 const MyRentPage = lazy(() => import('../pages/MyRentPage'));
 const AdminRentPage = lazy(() => import('../pages/AdminRentPage'));
+const AdminApplicationsPage = lazy(() => import('../pages/AdminApplicationsPage'));
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'));
 const NotificationsErrorBoundary = lazy(() => import('../components/Notifications/NotificationsErrorBoundary'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
@@ -95,6 +96,7 @@ function AppRoutes() {
             <Route path="/admin" element={<ErrorBoundary><AdminDashboardPage /></ErrorBoundary>} />
           <Route path="/admin/payments" element={<AdminPaymentsPage />} />
           <Route path="/admin/rent" element={<AdminRentPage />} />
+          <Route path="/admin/applications" element={<AdminApplicationsPage />} />
           <Route path="/admin/notifications" element={<NotificationsErrorBoundary><NotificationsPage /></NotificationsErrorBoundary>} />
         </Route>
 

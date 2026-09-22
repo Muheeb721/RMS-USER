@@ -59,6 +59,7 @@ export function AuthProvider({ children }) {
   const login = async ({ user: userData, token: authToken }) => {
     const normalizedUser = {
       ...userData,
+      id: userData?.id || userData?._id || userData?.userId || '',
       role: normalizeRole(userData?.role || 'user'),
       isLoggedIn: true,
     };
@@ -102,10 +103,14 @@ export function AuthProvider({ children }) {
       try {
         delete window.__RMS_AUTH_TOKEN;
         delete window.__rms_inmemory_token;
+        delete window[USER_KEY];
         window.localStorage.removeItem('rms_auth_session');
         window.localStorage.removeItem('rms_user_role');
         window.localStorage.removeItem('rms_admin_auth');
+        window.localStorage.removeItem('rms_admin_token');
         window.localStorage.removeItem('rms_token');
+        window.localStorage.removeItem('rms_remembered_email');
+        window.sessionStorage?.removeItem?.('rms_auth_session');
       } catch (e) {
         // ignore
       }

@@ -32,13 +32,20 @@ function Sidebar({ collapsed, onToggle }) {
       // ignore
     }
     dispatch(logout());
-    navigate('/login');
+    window.localStorage.removeItem('rms_auth_session');
+    window.localStorage.removeItem('rms_user_role');
+    window.localStorage.removeItem('rms_token');
+    window.localStorage.removeItem('rms_admin_token');
+    window.localStorage.removeItem('rms_remembered_email');
+    navigate('/login', { replace: true });
+    window.location.replace('/login');
   };
 
   const menu = [
     { to: '/', label: 'Dashboard', icon: <HomeOutlined /> },
     { to: '/properties', label: 'Properties', icon: <ApartmentOutlined /> },
     { to: '/bookings', label: 'Bookings', icon: <FileTextOutlined /> },
+    { to: '/admin/applications', label: 'Applications', icon: <FileTextOutlined /> },
     { to: '/payments', label: 'Payments', icon: <DollarCircleOutlined /> },
     { to: '/favorites', label: 'Favorites', icon: <HeartOutlined /> },
     { to: '/notifications', label: 'Notifications', icon: <BellOutlined /> },
@@ -63,6 +70,7 @@ function Sidebar({ collapsed, onToggle }) {
     { to: '/saved-searches', label: 'Saved Searches' },
     { to: '/ai-recommendations', label: 'AI Recommendations' },
     { to: '/bookings', label: 'Bookings' },
+    { to: '/admin/applications', label: 'Applications' },
     { to: '/maintenance', label: 'Maintenance' },
     { to: '/hostels', label: 'Hostels' },
     { to: '/favorites', label: 'Favorites' },

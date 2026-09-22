@@ -20,15 +20,24 @@ export const createPayment = async (payload = {}) => {
     const res = await api.request('/payments', { method: 'POST', body: payload });
     if (res && res.success && res.data) {
       try {
-        const note = createNotification({ type: 'payment', title: 'Payment recorded', message: `${res.data.userName || 'A user'} paid ${res.data.amountPaid || res.data.amount || 0}` });
+        const note = createNotification({
+          type: 'payment',
+          title: 'Payment recorded',
+          message: `${res.data.userName || 'A user'} paid ${res.data.amountPaid || res.data.amount || 0}`,
+        });
         await addStoredNotification(note);
-      } catch (e) {}
-      return res.data;
+      } catch (e) {
+        console.warn('Payment notification write failed after successful payment:', e);
+      }
+      return { success: true, data: res.data };
     }
-    return { ...payload };
+
+    const message = res?.message || 'Unable to record payment.';
+    return { success: false, message, data: null };
   } catch (e) {
+    const message = e?.response?.data?.message || 'Unable to record payment.';
     console.error('createPayment failed', e);
-    return { ...payload };
+    return { success: false, message, data: null };
   }
 };
 

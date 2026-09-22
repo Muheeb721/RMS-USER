@@ -1,5 +1,6 @@
 import { Modal, Form, Input, DatePicker, TimePicker, Button } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { toast } from 'react-toastify';
 import { add as addVisit } from '../utils/propertyVisitsStorage.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { createNotification } from '../services/notificationService.jsx';
@@ -8,7 +9,7 @@ function VisitModal({ open, onClose, property, onSubmitted }) {
   const [form] = Form.useForm();
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
+    form.validateFields().then(async (values) => {
       const date = values.date ? values.date.toISOString() : null;
       const time = values.time ? values.time.format('HH:mm') : null;
       const payload = {
@@ -24,19 +25,27 @@ function VisitModal({ open, onClose, property, onSubmitted }) {
         createdAt: new Date().toISOString(),
       };
 
-      addVisit(payload);
-
       try {
-        const note = createNotification({ type: 'contact', title: 'Visit Scheduled', message: `${payload.name} scheduled a visit for ${payload.propertyTitle} on ${date || 'N/A'} ${time || ''}` });
-        addStoredNotification(note);
-      } catch (e) {
-        console.error('notify visit', e);
-      }
+        const result = await addVisit(payload);
+        if (!result) {
+          throw new Error('Unable to schedule visit');
+        }
 
-      form.resetFields();
-      onClose();
-      onSubmitted && onSubmitted(payload);
-    });
+        try {
+          const note = createNotification({ type: 'contact', title: 'Visit Scheduled', message: `${payload.name} scheduled a visit for ${payload.propertyTitle} on ${date || 'N/A'} ${time || ''}` });
+          addStoredNotification(note);
+        } catch (e) {
+          console.error('notify visit', e);
+        }
+
+        toast.success('Visit request submitted.');
+        form.resetFields();
+        onClose();
+        onSubmitted && onSubmitted(result);
+      } catch (error) {
+        console.error('Visit submission failed', error);
+      }
+    }).catch(() => {});
   };
 
   return (

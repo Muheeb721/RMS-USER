@@ -1,8 +1,9 @@
-import { Modal, Form, Input, Button, Tag, Typography } from 'antd';
-import { CheckCircleOutlined, ShareAltOutlined } from '@ant-design/icons';
-import { toast } from 'react-toastify';
-import { recordDashboardSubmission } from '../utils/dashboardSubmissionStorage.jsx';
-import { sanitizeFullName, fullNameRule } from '../utils/nameValidation.jsx';
+import { Modal, Form, Input, Button, Tag, Typography } from "antd";
+import { CheckCircleOutlined, ShareAltOutlined } from "@ant-design/icons";
+import { toast } from "react-toastify";
+import api from "../services/api";
+import { recordDashboardSubmission } from "../utils/dashboardSubmissionStorage.jsx";
+import { sanitizeFullName, fullNameRule } from "../utils/nameValidation.jsx";
 
 const { Title, Text } = Typography;
 
@@ -10,32 +11,68 @@ function ActionModal({ open, onClose, type, item, onSubmit }) {
   const [form] = Form.useForm();
 
   const handleSubmit = () => {
-    form.validateFields().then((values) => {
-      const submissionPayload = { ...values, item };
+    form
+      .validateFields()
+      .then(async (values) => {
+        const submissionPayload = { ...values, item };
 
-      if (type === 'contact' && item) {
-        recordDashboardSubmission({
-          id: `contact-modal-${Date.now()}`,
-          source: 'contact',
-          formType: 'Property Contact Request',
-          title: `Viewing request for ${item.title || item.name || 'property'}`,
-          category: item.type || 'Property',
-          status: 'New',
-          userName: values.name || 'Guest',
-          email: values.email || '',
-          phone: '',
-          propertyType: item.type || 'Property',
-          location: item.address || item.location || '',
-          price: item.price || item.monthlyFee || '',
-          description: values.message || '',
-          submittedAt: new Date().toISOString(),
-        });
-      }
+        if (type === "contact" && item) {
+          try {
+            const response = await api.request("/bookings", {
+              method: "POST",
+              body: {
+                userName: values.name,
+                userEmail: values.email,
+                userPhone: values.phone || "",
+                propertyId: item._id || item.id || "",
+                propertyName: item.title || item.name || "",
+                propertyTitle: item.title || item.name || "",
+                propertyType: item.type || item.propertyType || "",
+                message: values.message || "",
+                flowType: "contact",
+              },
+            });
 
-      onSubmit?.(submissionPayload);
-      form.resetFields();
-      onClose();
-    });
+            if (!response || !response.success) {
+              throw new Error(
+                response?.message || "Unable to send viewing request",
+              );
+            }
+
+            recordDashboardSubmission({
+              id: `contact-modal-${Date.now()}`,
+              source: "contact",
+              formType: "Property Contact Request",
+              title: `Viewing request for ${item.title || item.name || "property"}`,
+              category: item.type || "Property",
+              status: "New",
+              userName: values.name || "Guest",
+              email: values.email || "",
+              phone: values.phone || "",
+              propertyType: item.type || "Property",
+              location: item.address || item.location || "",
+              price: item.price || item.monthlyFee || "",
+              description: values.message || "",
+              submittedAt: new Date().toISOString(),
+            });
+
+            toast.success("Your viewing request has been sent.");
+            onSubmit?.({ ...submissionPayload, serverResponse: response });
+            form.resetFields();
+            onClose();
+            return;
+          } catch (error) {
+            console.error("Action modal contact submission failed", error);
+            toast.error(error?.message || "Unable to send viewing request.");
+            return;
+          }
+        }
+
+        onSubmit?.(submissionPayload);
+        form.resetFields();
+        onClose();
+      })
+      .catch(() => {});
   };
 
   return (
@@ -43,10 +80,16 @@ function ActionModal({ open, onClose, type, item, onSubmit }) {
       open={open}
       onCancel={onClose}
       footer={null}
-      title={type === 'details' ? 'Listing overview' : type === 'share' ? 'Share this listing' : 'Book a viewing'}
+      title={
+        type === "details"
+          ? "Listing overview"
+          : type === "share"
+            ? "Share this listing"
+            : "Book a viewing"
+      }
       centered
     >
-      {type === 'details' && item && (
+      {type === "details" && item && (
         <div>
           <Title level={4}>{item.title}</Title>
           <Text type="secondary">{item.address}</Text>
@@ -55,47 +98,82 @@ function ActionModal({ open, onClose, type, item, onSubmit }) {
             {item.availability && <Tag color="green">{item.availability}</Tag>}
           </div>
           <div style={{ marginTop: 12 }}>
-            <Text strong>{item.price ? 'Price:' : 'Monthly fee:'}</Text> {item.price || item.monthlyFee}
+            <Text strong>{item.price ? "Price:" : "Monthly fee:"}</Text>{" "}
+            {item.price || item.monthlyFee}
           </div>
           <div style={{ marginTop: 8 }}>
-            {item.owner && <><Text strong>Owner:</Text> {item.owner}</>}
+            {item.owner && (
+              <>
+                <Text strong>Owner:</Text> {item.owner}
+              </>
+            )}
           </div>
           <div style={{ marginTop: 8 }}>
-            {item.contact && <><Text strong>Contact:</Text> {item.contact}</>}
+            {item.contact && (
+              <>
+                <Text strong>Contact:</Text> {item.contact}
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {type === 'contact' && item && (
+      {type === "contact" && item && (
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
             name="name"
             label="Your Name"
-            rules={[fullNameRule('Name')]}
+            rules={[fullNameRule("Name")]}
             getValueFromEvent={(event) => sanitizeFullName(event.target.value)}
           >
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="Email" rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}> 
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              {
+                required: true,
+                type: "email",
+                message: "Please enter a valid email",
+              },
+            ]}
+          >
             <Input />
           </Form.Item>
-          <Form.Item name="message" label="Message" rules={[{ required: true, message: 'Please mention your interest' }]}> 
+          <Form.Item
+            name="message"
+            label="Message"
+            rules={[
+              { required: true, message: "Please mention your interest" },
+            ]}
+          >
             <Input.TextArea rows={4} />
           </Form.Item>
-          <Button type="primary" htmlType="submit" icon={<CheckCircleOutlined />}>Request Viewing</Button>
+          <Button
+            type="primary"
+            htmlType="submit"
+            icon={<CheckCircleOutlined />}
+          >
+            Request Viewing
+          </Button>
         </Form>
       )}
 
-      {type === 'share' && item && (
+      {type === "share" && item && (
         <div>
-          <Text>Share this listing with a colleague, family member, or friend.</Text>
+          <Text>
+            Share this listing with a colleague, family member, or friend.
+          </Text>
           <div style={{ marginTop: 16 }}>
             <Button
               type="primary"
               icon={<ShareAltOutlined />}
               onClick={() => {
-                navigator.clipboard?.writeText(`${window.location.origin}/properties/${item.id}`);
-                toast.success('Share link copied to clipboard');
+                navigator.clipboard?.writeText(
+                  `${window.location.origin}/properties/${item.id}`,
+                );
+                toast.success("Share link copied to clipboard");
                 onClose();
               }}
             >
@@ -105,17 +183,17 @@ function ActionModal({ open, onClose, type, item, onSubmit }) {
         </div>
       )}
 
-      {type === 'edit' && (
+      {type === "edit" && (
         <Form
           form={form}
           layout="vertical"
           initialValues={{
             title: item?.title || item?.name,
-            image: item?.image || '',
-            price: item?.price || item?.monthlyFee || item?.rentPrice || '',
-            address: item?.address || item?.location || '',
-            area: item?.area || '',
-            type: item?.type || item?.category || '',
+            image: item?.image || "",
+            price: item?.price || item?.monthlyFee || item?.rentPrice || "",
+            address: item?.address || item?.location || "",
+            area: item?.area || "",
+            type: item?.type || item?.category || "",
             bedrooms: item?.bedrooms,
             bathrooms: item?.bathrooms,
             seats: item?.seats,
@@ -165,8 +243,12 @@ function ActionModal({ open, onClose, type, item, onSubmit }) {
           <Form.Item name="lng" label="Longitude">
             <Input />
           </Form.Item>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <Button type="primary" onClick={handleSubmit} icon={<CheckCircleOutlined />}>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <Button
+              type="primary"
+              onClick={handleSubmit}
+              icon={<CheckCircleOutlined />}
+            >
               Save
             </Button>
             <Button onClick={onClose}>Cancel</Button>

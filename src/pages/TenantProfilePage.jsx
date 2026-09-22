@@ -16,6 +16,8 @@ function TenantProfilePage() {
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
+  const [cnicImagePreview, setCnicImagePreview] = useState('');
 
   const returnTo = useMemo(() => {
     const route = searchParams.get('returnTo');
@@ -46,11 +48,14 @@ function TenantProfilePage() {
         const response = await api.request('/tenant-profiles/me');
         if (response?.success && response.data) {
           setProfile(response.data);
+          const profileImage = response.data.profileImage || response.data.image || '';
+          const cnicImage = response.data.cnicImage || response.data.idCardImage || '';
+          setProfileImagePreview(profileImage);
+          setCnicImagePreview(cnicImage);
           form.setFieldsValue({
             fullName: response.data.fullName || user.name || '',
             email: response.data.email || user.email || '',
             phone: response.data.phone || user.phone || '',
-            profileImage: response.data.profileImage || '',
             address: response.data.currentAddress || response.data.address || '',
             city: response.data.city || '',
             occupation: response.data.occupation || '',
@@ -71,31 +76,37 @@ function TenantProfilePage() {
     setError(null);
 
     try {
-      const payload = {
-        fullName: values.fullName?.trim(),
-        email: (values.email || user.email || '').trim(),
-        phone: values.phone?.trim(),
-        profileImage: values.profileImage?.trim() || '',
-        currentAddress: values.address?.trim(),
-        city: values.city?.trim(),
-        occupation: values.occupation?.trim(),
-        emergencyContactName: values.emergencyContact?.trim(),
-        emergencyContactPhone: values.emergencyContactNumber?.trim(),
-        propertyId,
-        propertyName: propertyTitle,
-        propertyType,
-        status: 'Pending',
-      };
+      const formData = new FormData();
+      const profileFile = values.profileImageFile;
+      const cnicFile = values.cnicImageFile;
 
-      const response = profile
-        ? await api.request(`/tenant-profiles/${profile._id || profile.id}`, {
-            method: 'PUT',
-            data: payload,
-          })
-        : await api.request('/tenant-profiles', {
-            method: 'POST',
-            data: payload,
-          });
+      formData.append('fullName', values.fullName?.trim() || '');
+      formData.append('email', (values.email || user.email || '').trim());
+      formData.append('phone', values.phone?.trim() || '');
+      formData.append('currentAddress', values.address?.trim() || '');
+      formData.append('city', values.city?.trim() || '');
+      formData.append('occupation', values.occupation?.trim() || '');
+      formData.append('emergencyContactName', values.emergencyContact?.trim() || '');
+      formData.append('emergencyContactPhone', values.emergencyContactNumber?.trim() || '');
+      formData.append('propertyId', propertyId || '');
+      formData.append('propertyName', propertyTitle || '');
+      formData.append('propertyType', propertyType || '');
+      formData.append('status', 'Pending');
+
+      if (profileFile instanceof File) {
+        formData.append('profileImage', profileFile);
+      }
+      if (cnicFile instanceof File) {
+        formData.append('cnicImage', cnicFile);
+      }
+
+      const response = await api.request('/users/profile', {
+        method: 'PUT',
+        data: formData,
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       if (!response || !response.success) {
         throw new Error(response?.message || 'Unable to save rental profile.');
@@ -168,9 +179,30 @@ function TenantProfilePage() {
             </Col>
           </Row>
 
-          <Form.Item name="profileImage" label="Profile Image URL (optional)">
-            <Input placeholder="https://example.com/your-photo.jpg" />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <Form.Item label="Profile Photo" name="profileImageFile" valuePropName="fileList" getValueFromEvent={(event) => {
+                const file = event?.target?.files?.[0];
+                return file || null;
+              }}>
+                <input type="file" accept="image/*" />
+              </Form.Item>
+              {profileImagePreview && (
+                <img src={profileImagePreview} alt="Profile preview" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} />
+              )}
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item label="CNIC/ID Photo" name="cnicImageFile" valuePropName="fileList" getValueFromEvent={(event) => {
+                const file = event?.target?.files?.[0];
+                return file || null;
+              }}>
+                <input type="file" accept="image/*" />
+              </Form.Item>
+              {cnicImagePreview && (
+                <img src={cnicImagePreview} alt="CNIC preview" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} />
+              )}
+            </Col>
+          </Row>
 
           <Form.Item name="address" label="Address" rules={[{ required: true, message: 'Address is required.' }]}>
             <Input placeholder="Enter your current address" />

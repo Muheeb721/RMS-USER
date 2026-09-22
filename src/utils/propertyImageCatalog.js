@@ -276,6 +276,20 @@ export const resolveUniquePropertyImage = (property = {}, section = 'properties'
     : normalizedType.includes('hostel') ? 'hostel'
     : '';
 
+  const candidates = [];
+  if (Array.isArray(property?.images) && property.images.length) {
+    candidates.push(...property.images.filter((src) => typeof src === 'string' && src.trim().length > 0 && !isBlockedRemoteImage(src)));
+  }
+
+  if (property?.image && !isBlockedRemoteImage(property.image)) {
+    candidates.push(property.image);
+  }
+
+  if (candidates.length) {
+    const desiredIndex = Number.isFinite(Number(property?.imageIndex)) ? Number(property.imageIndex) : Number(index) || 0;
+    return candidates[Math.abs(desiredIndex) % candidates.length];
+  }
+
   const catalogKey = normalizeCatalogKey(categoryKey || textType || 'OTHER');
   const catalogList = (catalogImageCache[catalogKey] || []).filter((src) => typeof src === 'string' && src.trim().length > 0);
   if (catalogList.length) {
@@ -296,17 +310,6 @@ export const resolveUniquePropertyImage = (property = {}, section = 'properties'
     const safeIndex = ((desiredIndex % assetList.length) + assetList.length) % assetList.length;
     return assetList[safeIndex];
   }
-
-  const candidates = [];
-  if (Array.isArray(property?.images) && property.images.length) {
-    candidates.push(...property.images.filter((src) => !isBlockedRemoteImage(src)));
-  }
-
-  if (property?.image && !isBlockedRemoteImage(property.image)) {
-    candidates.push(property.image);
-  }
-
-  if (candidates.length) return candidates[0];
 
   const fallbackMatch = imageFromTitle(property);
   if (fallbackMatch && !isBlockedRemoteImage(fallbackMatch)) return fallbackMatch;

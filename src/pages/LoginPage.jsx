@@ -168,6 +168,7 @@ function LoginPage() {
       // Normalize session user and register in AuthContext
       const now = new Date();
       const sessionUser = saveSessionUser({
+        id: userData.id || userData._id || userData.userId || '',
         name: userData.name || sanitizeFullName(normalizedEmail.split('@')[0].replace(/[._-]/g, ' ')) || 'RMS User',
         email: userData.email || normalizedEmail,
         role: userData.role || (/admin|owner|manager/i.test(normalizedEmail) ? 'admin' : 'resident'),

@@ -1,5 +1,6 @@
 import { Modal, Form, Input, Select, Button } from 'antd';
 import { CheckCircleOutlined } from '@ant-design/icons';
+import { toast } from 'react-toastify';
 import { add as addInquiry } from '../utils/propertyInquiriesStorage.jsx';
 import { createContactNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
@@ -23,33 +24,40 @@ function InquiryModal({ open, onClose, property, onSubmitted }) {
       };
 
       try {
-        await api.request('/contact', {
+        const response = await api.request('/contact', {
           method: 'POST',
           body: payload,
         });
+
+        if (!response || !response.success) {
+          throw new Error(response?.message || 'Unable to send inquiry');
+        }
+
+        addInquiry({
+          ...payload,
+          name: values.name,
+          propertyTitle: property?.title,
+          status: 'New',
+          createdAt: new Date().toISOString(),
+        });
+
+        try {
+          const note = createContactNotification({ fullName: payload.fullName, inquiryType: payload.inquiryType, property: payload.propertyName, message: payload.message, email: payload.email });
+          addStoredNotification(note);
+        } catch (e) {
+          console.error('notify inquiry', e);
+        }
+
+        toast.success('Inquiry submitted.');
+        form.resetFields();
+        onClose();
+        onSubmitted && onSubmitted(response.data || payload);
       } catch (error) {
         console.error('Inquiry API submission failed', error);
+        form.setFieldValue('message', values.message);
+        throw error;
       }
-
-      addInquiry({
-        ...payload,
-        name: values.name,
-        propertyTitle: property?.title,
-        status: 'New',
-        createdAt: new Date().toISOString(),
-      });
-
-      try {
-        const note = createContactNotification({ fullName: payload.fullName, inquiryType: payload.inquiryType, property: payload.propertyName, message: payload.message, email: payload.email });
-        addStoredNotification(note);
-      } catch (e) {
-        console.error('notify inquiry', e);
-      }
-
-      form.resetFields();
-      onClose();
-      onSubmitted && onSubmitted(payload);
-    });
+    }).catch(() => {});
   };
 
   return (

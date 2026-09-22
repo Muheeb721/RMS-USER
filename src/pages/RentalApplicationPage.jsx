@@ -3,6 +3,7 @@ import { Form, Input, DatePicker, Select, InputNumber, Row, Col, Button, Checkbo
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import bookingService from '../services/bookingService';
+import applicationService from '../services/applicationService';
 import propertyService from '../services/propertyService';
 import api from '../services/api';
 import selectedPropertyStorage from '../utils/selectedPropertyStorage.jsx';
@@ -151,6 +152,9 @@ function RentalApplicationPage() {
         propertyType: values.propertyType || (property && (property.propertyType || property.type)),
         rent: Number(values.rent || 0),
         rentFrequency: values.rentFrequency || 'Monthly',
+        flowType: 'rent_application',
+        profileImage: user?.profile?.profileImage || user?.profileImage || '',
+        cnicImage: user?.profile?.cnicImage || '',
         // personal
         cnic: values.cnic || '',
         dateOfBirth: values.dateOfBirth ? values.dateOfBirth.toISOString() : null,
@@ -182,7 +186,8 @@ function RentalApplicationPage() {
         termsAccepted: !!values.termsAccepted,
       };
 
-      const res = await bookingService.createBooking(payload);
+      // prefer using the new applications endpoint
+      const res = await applicationService.createApplication(payload).catch(() => null) || await bookingService.createBooking(payload);
       if (res && res.success && res.data) {
         setSuccessData(res.data);
         toast.success('Your rental application has been submitted successfully.');

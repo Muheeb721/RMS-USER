@@ -189,8 +189,7 @@ function PropertyListingsPage() {
       return;
     }
 
-    // default behavior for other modal types
-    toast.success('Request sent successfully');
+    // default behavior for other modal types is handled by the API-backed modal itself
   };
 
   return (
@@ -426,8 +425,8 @@ function PropertyListingsPage() {
       </section>
 
       <ActionModal open={Boolean(selectedProperty) && modalType !== 'contact'} onClose={() => setSelectedProperty(null)} type={modalType} item={selectedProperty} onSubmit={handleModalSubmit} />
-      <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={selectedProperty} onSubmitted={() => toast.success('Inquiry submitted.')} />
-      <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={selectedProperty} onSubmitted={() => toast.success('Visit request submitted.')} />
+      <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={selectedProperty} />
+      <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={selectedProperty} />
       <RentalBookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} property={selectedProperty} />
     </div>
   );

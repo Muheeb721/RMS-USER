@@ -188,7 +188,7 @@ function NotificationsPage() {
         const res = await fetchNotificationsFromServer();
         if (!mounted) return;
 
-        if (res && res.success && Array.isArray(res.data) && res.data.length) {
+        if (res && res.success && Array.isArray(res.data)) {
           const normalized = res.data.map(normalizeIncoming);
           setNotificationsList(normalized);
           dispatch(setReduxNotifications(normalized));
@@ -197,7 +197,7 @@ function NotificationsPage() {
           return;
         }
 
-        const fallbackNotifications = initialNotifications.map(normalizeIncoming);
+        const fallbackNotifications = [];
         setNotificationsList(fallbackNotifications);
         dispatch(setReduxNotifications(fallbackNotifications));
         saveStoredNotifications(fallbackNotifications);

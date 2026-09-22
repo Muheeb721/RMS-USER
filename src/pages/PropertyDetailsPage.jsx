@@ -3,6 +3,7 @@ import { Card, Row, Col, Descriptions, Button, Tag, Typography, Modal, Spin } fr
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import propertyService from '../services/propertyService';
+import favoriteService from '../services/favoriteService';
 import { useProperties } from '../contexts/PropertyContext';
 import './PropertyDetailsPage.css';
 import ActionModal from '../components/ActionModal';
@@ -21,8 +22,10 @@ import { toast } from 'react-toastify';
 
 const statusColorMap = {
   Available: 'green',
+  Booked: 'gold',
   Reserved: 'gold',
   Sold: 'red',
+  Rented: 'purple',
   'For Rent': 'blue',
 };
 
@@ -75,7 +78,7 @@ function PropertyDetailsPage() {
             bedrooms: item.bedrooms || 0,
             bathrooms: item.bathrooms || 0,
             parking: item.parking || 0,
-            status: item.status || item.availability || 'Available',
+            status: ['available', 'available now', 'ready', 'soon available'].includes(String(item.status || item.availability || '').toLowerCase()) ? 'Available' : ['booked', 'occupied', 'reserved', 'approved', 'confirmed'].includes(String(item.status || item.availability || '').toLowerCase()) ? 'Booked' : ['rented', 'leased'].includes(String(item.status || item.availability || '').toLowerCase()) ? 'Rented' : (item.status || item.availability || 'Available'),
             image: uniqueImages[0] || resolveUniquePropertyImage({ ...item, title: item.title || item.name || 'Property', type: item.type || item.propertyType || item.category || 'Property' }, 'properties', 0) || FALLBACK_IMAGE,
             images: uniqueImages.length ? uniqueImages : [resolveUniquePropertyImage({ ...item, title: item.title || item.name || 'Property', type: item.type || item.propertyType || item.category || 'Property' }, 'properties', 0) || FALLBACK_IMAGE],
             owner: item.ownerName || item.owner || 'RMS Admin',
@@ -306,15 +309,44 @@ function PropertyDetailsPage() {
                     Rent Now
                   </Button>
                 )}
-                <Button onClick={() => { setIsSaved((saved) => !saved); toast.success(isSaved ? 'Listing removed from saved items.' : 'Listing saved successfully.'); }}>{isSaved ? 'Saved' : 'Save Listing'}</Button>
+                <Button onClick={async () => {
+                  if (!isAuthenticated) {
+                    const target = `/properties/${property.id || property._id || ''}`;
+                    authRedirect.savePendingAction({
+                      action: 'SAVE_PROPERTY',
+                      propertyId: property.id || property._id || '',
+                      propertyType: property.type || property.propertyType || '',
+                      propertyTitle: property.title || property.name || '',
+                      returnRoute: target,
+                    });
+                    navigate(`/login?redirect=${encodeURIComponent(target)}`);
+                    return;
+                  }
+
+                  const nextSavedState = !isSaved;
+                  try {
+                    const result = nextSavedState
+                      ? await favoriteService.addFavorite(property.id || property._id)
+                      : await favoriteService.removeFavorite(property.id || property._id);
+
+                    if (!result || !result.success) {
+                      throw new Error(result?.message || 'Unable to update saved property');
+                    }
+
+                    setIsSaved(nextSavedState);
+                    toast.success(nextSavedState ? 'Listing saved successfully.' : 'Listing removed from saved items.');
+                  } catch (error) {
+                    toast.error(error?.message || 'Unable to update saved property');
+                  }
+                }}>{isSaved ? 'Saved' : 'Save Listing'}</Button>
               </div>
             </Card>
           </Col>
         </Row>
       </section>
-      <ActionModal open={contactOpen} onClose={() => setContactOpen(false)} type="contact" item={property} onSubmit={() => toast.success('Your viewing request has been sent.')} />
-      <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={property} onSubmitted={() => toast.success('Inquiry submitted.')} />
-      <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={property} onSubmitted={() => toast.success('Visit request submitted.')} />
+      <ActionModal open={contactOpen} onClose={() => setContactOpen(false)} type="contact" item={property} />
+      <InquiryModal open={inquiryOpen} onClose={() => setInquiryOpen(false)} property={property} />
+      <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} property={property} />
       <RentalBookingModal open={bookingOpen} onClose={() => setBookingOpen(false)} property={property} />
       <SimilarProperties property={property} />
     </div>

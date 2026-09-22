@@ -2,13 +2,27 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../services/api';
+import favoriteService from '../services/favoriteService';
 import { useAuth } from '../contexts/AuthContext';
 
 const DEFAULT_STATUS = {
   Available: 'success',
   'For Rent': 'processing',
+  Booked: 'warning',
   Rented: 'warning',
   Sold: 'error',
+};
+
+const normalizeDisplayStatus = (value) => {
+  const raw = String(value || '').trim();
+  const lowered = raw.toLowerCase();
+  if (!raw) return 'Available';
+  if (['available', 'available now', 'ready', 'soon available'].includes(lowered)) return 'Available';
+  if (['booked', 'occupied', 'reserved'].includes(lowered)) return 'Booked';
+  if (['rented', 'leased', 'tenant occupied'].includes(lowered)) return 'Rented';
+  if (['for rent', 'rent'].includes(lowered)) return 'For Rent';
+  if (['sold', 'closed'].includes(lowered)) return 'Sold';
+  return raw;
 };
 
 function PropertyCard({ property, onSavedChange }) {
@@ -22,7 +36,7 @@ function PropertyCard({ property, onSavedChange }) {
   const propertyId = property?._id || property?.id;
   const propertyTitle = property?.title || property?.name || 'Property';
   const price = property?.price || property?.rent || property?.askingPrice || 'Contact for price';
-  const status = property?.status || property?.availability || 'Available';
+  const status = normalizeDisplayStatus(property?.status || property?.availability || 'Available');
 
   const redirectTarget = useMemo(() => `/properties/${propertyId}`, [propertyId]);
 
@@ -48,19 +62,28 @@ function PropertyCard({ property, onSavedChange }) {
 
   const handleContactSubmit = async () => {
     try {
-      await api.post('/inquiries', {
-        propertyId,
-        propertyTitle,
-        fullName: user?.name || 'Guest User',
-        email: user?.email || 'guest@example.com',
-        message: inquiryText || `I am interested in ${propertyTitle}.`,
+      const response = await api.request('/contact', {
+        method: 'POST',
+        body: {
+          fullName: user?.name || 'Guest User',
+          email: user?.email || 'guest@example.com',
+          phone: user?.phone || '',
+          propertyId,
+          propertyName: propertyTitle,
+          inquiryType: 'Property Inquiry',
+          message: inquiryText || `I am interested in ${propertyTitle}.`,
+        },
       });
+
+      if (!response || !response.success) {
+        throw new Error(response?.message || 'Unable to send inquiry');
+      }
 
       toast.success('Inquiry sent successfully');
       setShowInquiry(false);
       setInquiryText('');
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Unable to send inquiry');
+      toast.error(error?.message || error?.response?.data?.message || 'Unable to send inquiry');
     }
   };
 
@@ -71,19 +94,23 @@ function PropertyCard({ property, onSavedChange }) {
       return;
     }
 
+    const nextSavedState = !saved;
+
     try {
       setSaving(true);
-      await api.post('/user/saved-properties', {
-        propertyId,
-        title: propertyTitle,
-      });
+      const result = nextSavedState
+        ? await favoriteService.addFavorite(propertyId)
+        : await favoriteService.removeFavorite(propertyId);
 
-      const nextSavedState = !saved;
+      if (!result || !result.success) {
+        throw new Error(result?.message || 'Unable to update saved property');
+      }
+
       setSaved(nextSavedState);
       if (onSavedChange) onSavedChange(propertyId, nextSavedState);
       toast.success(nextSavedState ? 'Property saved' : 'Property removed from saved list');
     } catch (error) {
-      toast.error(error?.response?.data?.message || 'Unable to update saved property');
+      toast.error(error?.message || error?.response?.data?.message || 'Unable to update saved property');
     } finally {
       setSaving(false);
     }

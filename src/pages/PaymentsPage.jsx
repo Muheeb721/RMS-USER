@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Table, Button, Modal, Form, Input, Select, DatePicker, Tag, Spin, Alert, Row, Col, Card, Statistic } from 'antd';
+import { toast } from 'react-toastify';
 import { getPayments, createPayment } from '../services/paymentsService.jsx';
 import { useSelector, useDispatch } from 'react-redux';
 import { addNotification } from '../redux/store';
@@ -46,7 +47,7 @@ function PaymentsPage() {
     return () => { mounted = false; window.removeEventListener('rms-payments-updated', onUpdate); };
   }, [user]);
 
-  const submit = (vals) => {
+  const submit = async (vals) => {
     const payload = {
       userName: vals.fullName,
       userEmail: vals.email,
@@ -63,11 +64,26 @@ function PaymentsPage() {
       status: undefined,
     };
 
-    const rec = createPayment(payload);
-    setOpen(false);
-    form.resetFields();
-    dispatch(addNotification({ id: Date.now(), title: 'Payment submitted successfully.', message: `Payment ${rec.id} recorded.`, unread: true, accent: 'success' }));
-    setPayments(getPayments().filter((p) => !user || String(p.userEmail) === String(user.email) || String(p.userId) === String(user.id)));
+    try {
+      const result = await createPayment(payload);
+      if (result && result.success && result.data) {
+        const paymentId = result.data.id || result.data._id || 'record';
+        dispatch(addNotification({ id: Date.now(), title: 'Payment submitted successfully.', message: `Payment ${paymentId} recorded.`, unread: true, accent: 'success' }));
+        toast.success('Payment submitted successfully.');
+        const refreshed = await getPayments();
+        setPayments(Array.isArray(refreshed) ? refreshed.filter((p) => !user || String(p.userEmail) === String(user.email) || String(p.userId) === String(user.id)) : []);
+      } else {
+        dispatch(addNotification({ id: Date.now(), title: 'Payment submission failed', message: result?.message || 'Unable to submit payment.', unread: true, accent: 'warning' }));
+        toast.error(result?.message || 'Unable to submit payment.');
+      }
+    } catch (e) {
+      console.error('payment submission failed', e);
+      dispatch(addNotification({ id: Date.now(), title: 'Payment submission failed', message: 'Unable to submit payment.', unread: true, accent: 'warning' }));
+      toast.error('Unable to submit payment.');
+    } finally {
+      setOpen(false);
+      form.resetFields();
+    }
   };
 
   const columns = [

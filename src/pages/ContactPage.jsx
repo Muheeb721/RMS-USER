@@ -207,13 +207,19 @@ function ContactPage() {
       inquiryType: "General Inquiry",
     };
 
+    let contactResponse;
     try {
-      await api.request('/contact', {
+      contactResponse = await api.request('/contact', {
         method: 'POST',
         body: payload,
       });
+      if (!contactResponse || !contactResponse.success) {
+        throw new Error(contactResponse?.message || 'Unable to send inquiry');
+      }
     } catch (apiError) {
       console.error('Contact API submission failed', apiError);
+      toast.error(apiError?.message || 'Unable to send inquiry. Please try again.');
+      return;
     }
 
     // If this inquiry is a purchase/buy action and a property is selected, create a booking record

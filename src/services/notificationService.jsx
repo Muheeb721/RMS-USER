@@ -23,8 +23,10 @@ const sanitizeUser = (user = {}) => {
   const rawName = typeof user.name === 'string' ? user.name.trim() : '';
   const fallbackName = email ? email.split('@')[0] : 'RMS User';
   const now = new Date();
+  const userId = user.id || user._id || user.userId || '';
 
   return {
+    id: String(userId || ''),
     name: rawName || fallbackName,
     email,
     role: user.role || 'user',

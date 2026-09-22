@@ -27,7 +27,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { motion } from "framer-motion";
-import { hostelData, popularAreas, stats, reviews, propertyData } from "../data/dummyData";
+import { hostelData, popularAreas, stats, reviews } from "../data/dummyData";
 import apiClient from '../services/apiClient';
 import { useProperties } from "../contexts/PropertyContext";
 import { useAuth } from '../contexts/AuthContext';
@@ -96,7 +96,25 @@ function HomePage() {
   const [rentalSelected, setRentalSelected] = useState(null);
   const [rentalBookingOpen, setRentalBookingOpen] = useState(false);
 
-  const normalizePropertyType = (property) => String(property?.type || property?.propertyType || property?.category || '').trim();
+  const inferPropertyType = (property) => {
+    const candidates = [property?.type, property?.propertyType, property?.category, property?.title];
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (!value) continue;
+      const lower = value.toLowerCase();
+      if (['house', 'houses', 'villa', 'villas'].includes(lower)) return 'House';
+      if (['apartment', 'apartments', 'condo', 'condos'].includes(lower)) return 'Apartment';
+      if (['flat', 'flats', 'studio', 'studios'].includes(lower)) return 'Flat';
+      if (['room', 'rooms', 'hostel', 'hostels'].includes(lower)) return 'Room';
+      if (lower.includes('house')) return 'House';
+      if (lower.includes('apartment')) return 'Apartment';
+      if (lower.includes('flat')) return 'Flat';
+      return value;
+    }
+    return '';
+  };
+
+  const normalizePropertyType = (property) => inferPropertyType(property);
 
   const HOME_VIP_HOUSES = catalogImages.HOUSE.length
     ? catalogImages.HOUSE.map((item) => item.imageUrl).filter(Boolean)
@@ -166,26 +184,158 @@ function HomePage() {
     return false;
   };
   const baseProperties = rawBaseProperties.filter(p => !isDemoProperty(p));
+  const normalizeCategoryLabel = (value = '') => {
+    const normalized = String(value || '').trim();
+    if (!normalized) return 'Properties';
+    const lower = normalized.toLowerCase();
+    if (['house', 'houses', 'villa', 'villas'].includes(lower)) return 'Houses';
+    if (['apartment', 'apartments', 'condo', 'condos'].includes(lower)) return 'Apartments';
+    if (['flat', 'flats', 'studio', 'studios'].includes(lower)) return 'Flats';
+    if (lower.includes('house')) return 'Houses';
+    if (lower.includes('apartment')) return 'Apartments';
+    if (lower.includes('flat')) return 'Flats';
+    return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+  };
+
+  const defaultSectionOrder = ['Houses', 'Apartments', 'Flats'];
+  const fallbackSectionCatalog = {
+    Houses: [
+      { id: 'fallback-house-1', title: '2 Storey Family Villa', type: 'House', category: 'House', propertyType: 'House', address: 'Bahria Town, Lahore', bedrooms: 4, bathrooms: 3, area: '2,500 sq ft', price: 'PKR 14,500,000', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'] },
+      { id: 'fallback-house-2', title: 'Modern Corner House', type: 'House', category: 'House', propertyType: 'House', address: 'Gulberg, Lahore', bedrooms: 5, bathrooms: 4, area: '3,200 sq ft', price: 'PKR 18,900,000', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'] },
+      { id: 'fallback-house-3', title: 'Luxury Garden Villa', type: 'House', category: 'House', propertyType: 'House', address: 'Defence, Lahore', bedrooms: 6, bathrooms: 5, area: '4,100 sq ft', price: 'PKR 27,400,000', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80'] },
+    ],
+    Apartments: [
+      { id: 'fallback-apartment-1', title: 'Skyline Residency', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'Johar Town, Lahore', bedrooms: 3, bathrooms: 2, area: '1,750 sq ft', price: 'PKR 9,800,000', image: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80'] },
+      { id: 'fallback-apartment-2', title: 'City View Heights', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'Model Town, Lahore', bedrooms: 2, bathrooms: 2, area: '1,250 sq ft', price: 'PKR 6,200,000', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80'] },
+      { id: 'fallback-apartment-3', title: 'Pearl Apartments', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'DHA Phase 6, Lahore', bedrooms: 4, bathrooms: 3, area: '2,300 sq ft', price: 'PKR 13,600,000', image: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80'] },
+    ],
+    Flats: [
+      { id: 'fallback-flat-1', title: 'Comfort Flat Deluxe', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Wapda Town, Lahore', bedrooms: 2, bathrooms: 2, area: '1,050 sq ft', price: 'PKR 70,000 / month', image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
+      { id: 'fallback-flat-2', title: 'Riverside Studio Flat', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Faisal Town, Lahore', bedrooms: 1, bathrooms: 1, area: '760 sq ft', price: 'PKR 52,000 / month', image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
+      { id: 'fallback-flat-3', title: 'Executive Family Flat', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Cavalry Ground, Lahore', bedrooms: 3, bathrooms: 2, area: '1,450 sq ft', price: 'PKR 88,000 / month', image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
+    ],
+  };
+
+  const buildFallbackSectionItems = (title) => {
+    const source = fallbackSectionCatalog[title] || [];
+    return source.map((item, index) => ({
+      ...item,
+      id: item.id || `${title.toLowerCase()}-${index + 1}`,
+      title: item.title || `${title} Listing`,
+      address: item.address || 'Lahore, Pakistan',
+      location: item.address || 'Lahore, Pakistan',
+      bedrooms: item.bedrooms || 2,
+      bathrooms: item.bathrooms || 2,
+      area: item.area || '1,200 sq ft',
+      price: item.price || 'Contact',
+      transactionType: item.transactionType || (title === 'Flats' ? 'Rent' : 'Sale'),
+      type: item.type || title.replace(/s$/, ''),
+      propertyType: item.propertyType || title.replace(/s$/, ''),
+      category: item.category || title.replace(/s$/, ''),
+      image: item.image || item.images?.[0] || FALLBACK_IMAGE,
+      images: item.images || [item.image || FALLBACK_IMAGE],
+    }));
+  };
+
+  const buildDefaultSections = () => defaultSectionOrder.map((title) => ({
+    title,
+    accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
+    items: buildFallbackSectionItems(title),
+  }));
+
   const getCategoryProperties = (categoryName) => {
-    const normalizedCategory = categoryName.toLowerCase();
+    const normalizedCategory = String(categoryName || '').toLowerCase();
+    const aliases = {
+      house: ['house', 'houses', 'villa', 'villas'],
+      apartment: ['apartment', 'apartments', 'condo', 'condos'],
+      flat: ['flat', 'flats', 'studio', 'studios'],
+    };
+
     const matches = baseProperties.filter((property) => {
       const typeValue = normalizePropertyType(property).toLowerCase();
-      return typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
+      const allowedValues = aliases[normalizedCategory] || [normalizedCategory];
+      return allowedValues.includes(typeValue) || typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
     });
 
-    if (matches.length >= 3) return matches.slice(0, 3);
-
-    const fallbackMatches = propertyData.filter((property) => {
-      const typeValue = normalizePropertyType(property).toLowerCase();
-      return typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
-    });
-
-    return [...matches, ...fallbackMatches.filter((property) => !matches.some((item) => item.id === property.id))].slice(0, 3);
+    return matches.slice(0, 3);
   };
+
+  const getCustomCategoryGroups = () => {
+    const groups = new Map();
+    for (const property of baseProperties) {
+      const label = normalizeCategoryLabel(
+        inferPropertyType(property) || property?.category || property?.type || property?.propertyType || 'Properties'
+      );
+      if (!groups.has(label)) groups.set(label, []);
+      groups.get(label).push(property);
+    }
+
+    const defaultGroups = ['Houses', 'Apartments', 'Flats'];
+    const orderedGroups = [];
+
+    for (const key of defaultGroups) {
+      const inheritedItems = groups.get(key) || getCategoryProperties(key.toLowerCase().replace(/s$/, ''));
+      orderedGroups.push({
+        title: key,
+        items: Array.isArray(inheritedItems) ? inheritedItems.slice(0, 3) : [],
+        accent: key === 'Flats' ? '#14b8a6' : key === 'Apartments' ? '#0ea5e9' : '#d97706',
+      });
+    }
+
+    for (const [title, items] of groups.entries()) {
+      if (defaultGroups.includes(title)) continue;
+      if (!Array.isArray(items) || !items.length) continue;
+      orderedGroups.push({
+        title,
+        items: items.slice(0, 3),
+        accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
+      });
+    }
+
+    return orderedGroups.slice(0, 6);
+  };
+
+  const dynamicPropertySections = useMemo(() => getCustomCategoryGroups(), [baseProperties]);
 
   const houseProperties = getCategoryProperties('house');
   const apartmentProperties = getCategoryProperties('apartment');
   const flatProperties = getCategoryProperties('flat');
+  const visiblePropertySections = useMemo(() => {
+    const grouped = new Map();
+    const orderedTitles = defaultSectionOrder;
+
+    for (const property of baseProperties) {
+      const label = normalizeCategoryLabel(
+        inferPropertyType(property) || property?.category || property?.type || property?.propertyType || 'Properties'
+      );
+      const items = grouped.get(label) || [];
+      items.push(property);
+      grouped.set(label, items);
+    }
+
+    const ordered = orderedTitles.map((title) => {
+      const fallbackItems = grouped.get(title) || getCategoryProperties(title.toLowerCase().replace(/s$/, ''));
+      const resolvedItems = Array.isArray(fallbackItems) && fallbackItems.length > 0
+        ? fallbackItems.slice(0, 3)
+        : buildFallbackSectionItems(title);
+      return {
+        title,
+        accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
+        items: resolvedItems,
+      };
+    });
+
+    const extras = [...grouped.entries()]
+      .filter(([title]) => !orderedTitles.includes(title))
+      .map(([title, items]) => ({
+        title,
+        accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
+        items: items.slice(0, 3),
+      }));
+
+    return [...ordered, ...extras];
+  }, [baseProperties]);
+
   const featuredHouseProperties = [...houseProperties].sort((a, b) => {
     const lowA = String(a.title || '').toLowerCase();
     const lowB = String(b.title || '').toLowerCase();
@@ -245,7 +395,10 @@ function HomePage() {
     return property?.price || property?.rentPrice || 'Contact';
   };
 
-  const renderCategoryShowcase = (title, items, accentColor = '#0f172a', overlayText = '') => (
+  const renderCategoryShowcase = (title, items, accentColor = '#0f172a', overlayText = '') => {
+    const safeItems = Array.isArray(items) && items.length > 0 ? items : buildFallbackSectionItems(title);
+
+    return (
     <section className="hr-section home-category-section" key={title}>
       <div className="section-header">
         <div>
@@ -256,7 +409,7 @@ function HomePage() {
       </div>
 
       <Row gutter={[18, 18]} className="home-category-grid" style={{ marginTop: 12 }}>
-        {(items && items.length ? items.slice(0, 3) : []).map((property, index) => (
+        {safeItems.slice(0, 3).map((property, index) => (
           <Col xs={24} sm={12} md={8} key={property.id || `${title}-${property.title}`}>
             <Card
               cover={
@@ -264,10 +417,9 @@ function HomePage() {
                   <img
                     alt={property.title}
                     src={
-                      title === 'Houses' ? (HOME_VIP_HOUSES[index] || resolveUniquePropertyImage(property, 'home', index))
-                      : title === 'Flats' ? (HOME_FLATS_INTERIOR[index] || resolveUniquePropertyImage(property, 'home', index))
-                      : title === 'Apartments' ? (HOME_APARTMENTS_BUILDINGS[index] || resolveUniquePropertyImage(property, 'home', index))
-                      : (resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE)
+                      Array.isArray(property?.images) && property.images.length
+                        ? property.images[0]
+                        : property?.image || resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE
                     }
                     loading="lazy"
                     style={{ width: '100%', height: 260, objectFit: 'cover' }}
@@ -310,7 +462,8 @@ function HomePage() {
         ))}
       </Row>
     </section>
-  );
+    );
+  };
 
   // no inline dashboard entries on home page
 
@@ -339,9 +492,7 @@ function HomePage() {
         </div>
       </motion.div>
 
-      {renderCategoryShowcase('Houses', houseProperties, '#d97706')}
-      {renderCategoryShowcase('Apartments', apartmentProperties, '#0ea5e9')}
-      {renderCategoryShowcase('Flats', flatProperties, '#14b8a6', 'FOR RENT')}
+      {visiblePropertySections.map((section) => renderCategoryShowcase(section.title, section.items, section.accent, section.title === 'Flats' ? 'FOR RENT' : ''))}
 
       <WhyChooseRMS />
       <HowItWorks />

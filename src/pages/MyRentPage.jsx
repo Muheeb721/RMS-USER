@@ -21,7 +21,8 @@ function MyRentPage() {
 
   const refreshBookings = async () => {
     try {
-      const response = await api.request('/bookings/me');
+      // prefer user's applications endpoint, fall back to bookings
+      const response = await api.request('/applications/me').catch(() => null) || await api.request('/bookings/me');
       if (response && response.success) {
         setBookings(response.data || []);
       }

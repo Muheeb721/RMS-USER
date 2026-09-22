@@ -2,7 +2,6 @@ import { Layout } from "antd";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import HeaderNav from "../components/Header";
-import ChatBot from "../components/ChatBot/ChatBot";
 import "../styles/global.css";
 
 const { Content, Footer } = Layout;
@@ -26,8 +25,6 @@ function MainLayout() {
           </motion.div>
         </Content>
       </div>
-
-      <ChatBot />
 
       <Footer
         style={{
