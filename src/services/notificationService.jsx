@@ -129,6 +129,20 @@ export const createNotification = ({ type, title, message, userName, email, crea
 
 import apiClient from './apiClient';
 
+export const downloadRentalAgreement = async (applicationId) => {
+  const response = await apiClient.get(`/applications/${encodeURIComponent(applicationId)}/agreement`, {
+    responseType: 'blob',
+  });
+  const objectUrl = URL.createObjectURL(response.data);
+  const anchor = document.createElement('a');
+  anchor.href = objectUrl;
+  anchor.download = `rental-agreement-${applicationId}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+};
+
 export const fetchNotificationsFromServer = async () => {
   try {
     if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV) {
@@ -160,6 +174,7 @@ export const fetchNotificationsFromServer = async () => {
         actorType: it.actorType,
         actorName: it.actorName,
         status: it.status,
+        agreementApplicationId: it.metadata?.rentalApplicationId || '',
         raw: it,
       };
     });
@@ -186,28 +201,43 @@ export const markNotificationAsReadOnServer = async (id) => {
     } : null;
     return { success: true, data: mapped };
   } catch (error) {
-    console.warn('Mark notification read failed:', error);
-    return { success: false };
+    try {
+      const res = await apiClient.patch(`/notifications/${id}/read`);
+      return { success: true, data: res?.data?.data || null };
+    } catch (retryErr) {
+      console.warn('Mark notification read failed:', retryErr);
+      return { success: false };
+    }
   }
 };
 
 export const getUnreadCountFromServer = async () => {
   try {
-    const res = await apiClient.get('/notifications/count');
+    const res = await apiClient.get('/notifications/unread-count');
     return { success: true, data: res.data.data || { count: 0 } };
   } catch (error) {
-    console.warn('Get unread count failed:', error);
-    return { success: false, data: { count: 0 } };
+    try {
+      const res = await apiClient.get('/notifications/count');
+      return { success: true, data: res.data.data || { count: 0 } };
+    } catch (fallbackErr) {
+      console.warn('Get unread count failed:', fallbackErr);
+      return { success: false, data: { count: 0 } };
+    }
   }
 };
 
 export const markAllNotificationsOnServer = async () => {
   try {
-    await apiClient.post('/notifications/mark-all-read');
+    await apiClient.patch('/notifications/read-all');
     return { success: true };
   } catch (error) {
-    console.warn('Mark all notifications read failed:', error);
-    return { success: false };
+    try {
+      await apiClient.post('/notifications/mark-all-read');
+      return { success: true };
+    } catch (fallbackErr) {
+      console.warn('Mark all notifications read failed:', fallbackErr);
+      return { success: false };
+    }
   }
 };
 

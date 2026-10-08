@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { CloseOutlined, MessageOutlined, RobotOutlined, SendOutlined } from '@ant-design/icons';
 import './ChatWidget.css';
 
-const API_BASE_URL = import.meta.env.VITE_CHATBOT_API_URL || 'http://localhost:8000';
+// Node backend ka chatbot route (React -> Node 5000 -> FastAPI 8000)
+const CHAT_API_URL = 'http://localhost:5000/api/chatbot/message';
+
+// Har browser session ke liye ek unique ID (taake conversation history yaad rahe)
+const SESSION_ID = 'rms-user-' + Math.random().toString(36).substring(2, 10);
 
 const initialMessages = [
   {
@@ -40,12 +44,12 @@ function ChatWidget() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/chat`, {
+      const response = await fetch(CHAT_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: trimmed }),
+        body: JSON.stringify({ session_id: SESSION_ID, message: trimmed }),
       });
 
       if (!response.ok) {

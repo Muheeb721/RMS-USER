@@ -56,3 +56,86 @@
 /* ensure no accidental horizontal overflow inside hero */
 .hr-hero, .hr-hero-inner { max-width: 1100px; margin-left: auto; margin-right: auto }
 
+.home-carousel {
+  width: 100%;
+}
+
+.home-carousel-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-carousel-controls span {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.home-carousel-track {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  align-items: stretch;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+
+.home-carousel-track::-webkit-scrollbar {
+  display: none;
+}
+
+.home-carousel-item {
+  flex: 0 0 calc((100% - 32px) / 3);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
+.home-carousel-item .ant-card {
+  height: 100%;
+}
+
+.home-category-card .card-body {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+}
+
+.home-category-card .card-actions {
+  margin-top: auto;
+}
+
+.home-category-no-image,
+.home-category-empty {
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 10px 10px 0 0;
+}
+
+.home-category-empty {
+  min-height: 120px;
+  border-radius: 12px;
+}
+
+@media (max-width: 1100px) {
+  .home-carousel-item {
+    flex-basis: calc((100% - 16px) / 2);
+  }
+}
+
+@media (max-width: 480px) {
+  .home-carousel-item {
+    flex-basis: 100%;
+  }
+}
+
+@media (min-width: 1200px) {
+  .home-carousel-item {
+    flex-basis: calc((100% - 32px) / 3);
+  }
+}

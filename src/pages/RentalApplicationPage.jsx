@@ -27,6 +27,8 @@ function RentalApplicationPage() {
   const [successData, setSuccessData] = useState(null);
   const [profileReady, setProfileReady] = useState(false);
   const [propertyError, setPropertyError] = useState(null);
+  const [profileError, setProfileError] = useState(null);
+  const [profileCheckAttempt, setProfileCheckAttempt] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -34,75 +36,97 @@ function RentalApplicationPage() {
       const sessionUser = user || {};
       if (!sessionUser.id && !sessionUser.email) {
         const target = encodeURIComponent(`${window.location.pathname}${window.location.search}`);
-        navigate(`/login?redirect=${target}`, { replace: true });
+        navigate(`/signup?redirect=${target}`, { replace: true });
         return;
+      }
+
+      setProfileReady(false);
+      setProfileError(null);
+      setPropertyError(null);
+      const requestedPropertyId = searchParams.get('propertyId') || '';
+      const selected = await selectedPropertyStorage.readSelectedProperty().catch(() => null);
+      const selectedId = selected?._id || selected?.id || '';
+      let selectedProperty = requestedPropertyId && String(selectedId) === requestedPropertyId
+        ? selected
+        : !requestedPropertyId
+          ? selected
+          : null;
+
+      if (requestedPropertyId && !isValidMongoObjectId(requestedPropertyId)) {
+        if (mounted) {
+          setPropertyError('The selected property ID is invalid. Return to the property listing and select it again.');
+          setProfileReady(true);
+        }
+        return;
+      }
+
+      if (!selectedProperty && requestedPropertyId) {
+        try {
+          const propertyResponse = await propertyService.getPropertyById(requestedPropertyId);
+          if (propertyResponse?.success && propertyResponse.data) {
+            selectedProperty = propertyResponse.data;
+            await selectedPropertyStorage.saveSelectedProperty(selectedProperty);
+          } else {
+            throw new Error(propertyResponse?.message || 'Property not found.');
+          }
+        } catch (error) {
+          if (mounted) {
+            setPropertyError(`Unable to load the selected property: ${error?.message || 'Property not found.'}`);
+            setProfileReady(true);
+          }
+          return;
+        }
+      }
+
+      if (!selectedProperty) {
+        if (mounted) {
+          setPropertyError('Select a property from the listings before starting a rental application.');
+          setProfileReady(true);
+        }
+        return;
+      }
+
+      const selectedPropertyId = selectedProperty._id || selectedProperty.id || requestedPropertyId;
+      if (mounted) {
+        setProperty(selectedProperty);
+        form.setFieldsValue({
+          propertyTitle: selectedProperty.title || selectedProperty.name || '',
+          propertyId: selectedPropertyId,
+          propertyType: selectedProperty.propertyType || selectedProperty.type || '',
+          rent: selectedProperty.rent || selectedProperty.price || 0,
+        });
       }
 
       try {
         const profileRes = await api.request('/tenant-profiles/me');
-        if (mounted && profileRes && profileRes.success && profileRes.data) {
-          setProfileReady(true);
-        } else if (mounted) {
-          const propertyId = searchParams.get('propertyId');
-          const returnTo = `${window.location.pathname}${window.location.search}`;
-          const target = propertyId
-            ? `/tenant-profile?propertyId=${encodeURIComponent(propertyId)}&returnTo=${encodeURIComponent(returnTo)}`
-            : `/tenant-profile?returnTo=${encodeURIComponent(returnTo)}`;
-          navigate(target, { replace: true });
+        if (!profileRes?.success) {
+          throw new Error(profileRes?.message || 'Unable to check your rental profile.');
+        }
+        if (profileRes.data) {
+          if (mounted) setProfileReady(true);
           return;
         }
+
+        const returnTo = `/rental-application?propertyId=${encodeURIComponent(selectedPropertyId)}`;
+        const profileParams = new URLSearchParams({
+          propertyId: String(selectedPropertyId),
+          propertyTitle: selectedProperty.title || selectedProperty.name || '',
+          propertyType: selectedProperty.propertyType || selectedProperty.type || '',
+          returnTo,
+        });
+        navigate(`/tenant-profile?${profileParams.toString()}`, { replace: true });
+        return;
       } catch (error) {
         if (mounted) {
-          const propertyId = searchParams.get('propertyId');
-          const returnTo = `${window.location.pathname}${window.location.search}`;
-          const target = propertyId
-            ? `/tenant-profile?propertyId=${encodeURIComponent(propertyId)}&returnTo=${encodeURIComponent(returnTo)}`
-            : `/tenant-profile?returnTo=${encodeURIComponent(returnTo)}`;
-          navigate(target, { replace: true });
+          setProfileError(error?.message || 'Unable to check your rental profile.');
+          setProfileReady(true);
           return;
         }
       }
-
-      const sp = await selectedPropertyStorage.readSelectedProperty().catch(() => null);
-      if (mounted && sp) {
-        setProperty(sp);
-        setPropertyError(null);
-        form.setFieldsValue({ propertyTitle: sp.title, propertyId: sp.id || sp._id, propertyType: sp.type || sp.propertyType, rent: sp.rent || sp.price || 0 });
-        return;
-      }
-
-      const propId = searchParams.get('propertyId');
-      if (propId) {
-        // Validate that the property ID is a valid MongoDB ObjectId
-        if (!isValidMongoObjectId(propId)) {
-          if (mounted) {
-            setPropertyError(`Invalid property ID format: "${propId}". Property ID must be a valid 24-character identifier.`);
-            console.warn('Invalid property ID format:', propId);
-          }
-          return;
-        }
-
-        try {
-          const res = await propertyService.getPropertyById(propId);
-          if (mounted && res && res.success && res.data) {
-            const p = res.data;
-            setProperty(p);
-            setPropertyError(null);
-            form.setFieldsValue({ propertyTitle: p.title, propertyId: p._id || p.id, propertyType: p.propertyType || p.type, rent: p.rent || p.price || 0 });
-          } else if (mounted) {
-            setPropertyError(`Unable to load property: ${res?.message || 'Property not found'}`);
-            console.warn('Unable to load property', res?.message);
-          }
-        } catch (e) {
-          if (mounted) {
-            setPropertyError(`Error loading property: ${e.message}`);
-            console.warn('Unable to load property', e);
-          }
-        }
-      }
+      if (mounted) setProfileReady(true);
     })();
     return () => { mounted = false; };
-  }, [searchParams, navigate, user, form]);
+  }, [searchParams, navigate, user, form, profileCheckAttempt]);
 
   useEffect(() => {
     form.setFieldsValue({ fullName: user.name || '', email: user.email || '' });
@@ -110,8 +134,10 @@ function RentalApplicationPage() {
 
   const isPurchase = (prop) => {
     if (!prop) return false;
-    const tx = String(prop.transactionType || prop.purpose || '').toLowerCase();
-    if (tx.includes('sale') || tx.includes('buy') || tx.includes('purchase')) return true;
+    const listingType = String(prop.listingType || prop.listing_type || '').trim().toLowerCase();
+    if (listingType) return ['sale', 'sell', 'buy', 'purchase', 'for sale'].includes(listingType);
+    const transactionType = String(prop.transactionType || prop.purpose || '').trim().toLowerCase();
+    if (transactionType) return ['sale', 'sell', 'buy', 'purchase', 'for sale'].includes(transactionType);
     if (prop.salePrice || prop.saleAmount) return true;
     if (prop.price && !prop.rent) return true;
     return false;
@@ -142,7 +168,7 @@ function RentalApplicationPage() {
 
       const payload = {
         // user info
-        userId: user.id || user.email || null,
+        userId: user.id || undefined,
         userName: values.fullName,
         userEmail: values.email,
         userPhone: values.phone,
@@ -186,8 +212,14 @@ function RentalApplicationPage() {
         termsAccepted: !!values.termsAccepted,
       };
 
-      // prefer using the new applications endpoint
-      const res = await applicationService.createApplication(payload).catch(() => null) || await bookingService.createBooking(payload);
+      let res;
+      try {
+        res = await applicationService.createApplication(payload);
+      } catch (error) {
+        if (error?.response?.status !== 404) throw error;
+        res = await bookingService.createBooking(payload);
+      }
+
       if (res && res.success && res.data) {
         setSuccessData(res.data);
         toast.success('Your rental application has been submitted successfully.');
@@ -210,7 +242,23 @@ function RentalApplicationPage() {
   if (!profileReady) {
     return (
       <div className="page-shell" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 240 }}>
-        <Spin size="large" tip="Checking your rental profile..." />
+        <Form form={form} style={{ display: 'none' }} />
+        <Spin size="large" description="Checking your rental profile..." />
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div className="page-shell" style={{ maxWidth: 900, margin: '32px auto', padding: '0 16px' }}>
+        <Form form={form} style={{ display: 'none' }} />
+        <Alert
+          type="error"
+          showIcon
+          title="Unable to verify your rental profile"
+          description={profileError}
+          action={<Button onClick={() => setProfileCheckAttempt((attempt) => attempt + 1)}>Retry</Button>}
+        />
       </div>
     );
   }
@@ -225,7 +273,7 @@ function RentalApplicationPage() {
               
               {propertyError && (
                 <Alert 
-                  message="Property Error" 
+                  title="Property Error" 
                   description={propertyError} 
                   type="error" 
                   showIcon 

@@ -1,53 +1,63 @@
 import { useState } from 'react';
 import { Form, Input, Button } from 'antd';
-import { useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { login, addNotification } from '../../redux/store';
-import { createLoginNotification, saveSessionUser } from '../../services/notificationService.jsx';
-import { addStoredNotification } from '../../utils/notificationsStorage.jsx';
-import { sanitizeFullName, fullNameRule } from '../../utils/nameValidation.jsx';
+import authService from '../../services/authService';
 
 function LoginForm() {
-  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (values) => {
+  const handleSubmit = async (values) => {
     setLoading(true);
 
-    const now = new Date();
-    const userName = sanitizeFullName(values.name) || values.email?.split('@')[0].replace(/[._-]/g, ' ').trim() || 'RMS User';
-    const user = saveSessionUser({
-      name: userName,
-      email: values.email.trim(),
-      role: 'user',
-      isLoggedIn: true,
-      loginDate: now.toLocaleDateString('en-PK'),
-      loginTime: now.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
-    });
+    try {
+      const result = await authService.login(values.email, values.password);
+      const success = Boolean(result?.success ?? result?.data?.success ?? result?.data?.result?.success);
+      if (!success || !result?.token && !result?.data?.token && !result?.data?.result?.token) {
+        throw new Error(result?.message || result?.data?.message || 'Login failed');
+      }
 
-    dispatch(login(user));
-    const note = createLoginNotification(user);
-    dispatch(addNotification(note));
-    // persist notification to backend when possible
-    try { addStoredNotification(note); } catch (e) { /* ignore */ }
-    form.resetFields();
-    setLoading(false);
-    toast.success(`Welcome back, ${user.name}!`);
-    navigate('/dashboard');
+      const token = result?.token ?? result?.data?.token ?? result?.data?.result?.token;
+      const user = result?.user ?? result?.data?.user ?? result?.data?.result?.user;
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('rms_token', token);
+        window.localStorage.setItem('rms_auth_session', JSON.stringify(user));
+      }
+
+      form.resetFields();
+      toast.success('Login successful');
+      navigate('/dashboard');
+    } catch (error) {
+      toast.error(error.message || 'Unable to login. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <Form form={form} layout="vertical" className="auth-form" onFinish={handleSubmit}>
-      <Form.Item label="Name" name="name" rules={[fullNameRule('Name')]} getValueFromEvent={(event) => sanitizeFullName(event.target.value)}>
-        <Input placeholder="Ahmed Khan" />
+      <Form.Item
+        label="Email or Username"
+        name="email"
+        rules={[
+          { required: true, message: 'Please enter your email or username' },
+          {
+            validator: (_, value) => {
+              const cleaned = String(value || '').trim();
+              if (!cleaned) {
+                return Promise.reject(new Error('Please enter your email or username'));
+              }
+              return Promise.resolve();
+            },
+          },
+        ]}
+      >
+        <Input placeholder="you@example.com or username" />
       </Form.Item>
-      <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Please enter your email' }, { type: 'email', message: 'Please enter a valid email' }] }>
-        <Input placeholder="you@example.com" />
-      </Form.Item>
-      <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please enter your password' }] }>
+      <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
         <Input.Password placeholder="Enter password" />
       </Form.Item>
       <Button type="primary" htmlType="submit" block loading={loading}>

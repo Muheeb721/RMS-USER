@@ -47,6 +47,7 @@ function Sidebar({ collapsed, onToggle }) {
     { to: '/bookings', label: 'Bookings', icon: <FileTextOutlined /> },
     { to: '/admin/applications', label: 'Applications', icon: <FileTextOutlined /> },
     { to: '/payments', label: 'Payments', icon: <DollarCircleOutlined /> },
+    { to: '/upload-payment-proof', label: 'Upload Payment Proof', icon: <DollarCircleOutlined /> },
     { to: '/favorites', label: 'Favorites', icon: <HeartOutlined /> },
     { to: '/notifications', label: 'Notifications', icon: <BellOutlined /> },
     { to: '/profile', label: 'Profile', icon: <UserOutlined /> },

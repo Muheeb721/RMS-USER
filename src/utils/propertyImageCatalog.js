@@ -1,4 +1,5 @@
 import { FALLBACK_IMAGE } from './imageUtils';
+import { resolveImageUrl } from './imageUrl';
 
 const LOCAL_IMAGE_ROOT = '/images';
 const catalogImageCache = {
@@ -278,11 +279,16 @@ export const resolveUniquePropertyImage = (property = {}, section = 'properties'
 
   const candidates = [];
   if (Array.isArray(property?.images) && property.images.length) {
-    candidates.push(...property.images.filter((src) => typeof src === 'string' && src.trim().length > 0 && !isBlockedRemoteImage(src)));
+    candidates.push(...property.images
+      .map((src) => resolveImageUrl(typeof src === 'object' ? src?.url : src))
+      .filter((src) => typeof src === 'string' && src.trim().length > 0 && !isBlockedRemoteImage(src)));
   }
 
-  if (property?.image && !isBlockedRemoteImage(property.image)) {
-    candidates.push(property.image);
+  const primaryImage = typeof property?.image === 'object' ? property.image?.url : property?.image;
+  if (primaryImage && !isBlockedRemoteImage(primaryImage)) {
+    candidates.push(resolveImageUrl(primaryImage));
+  } else if (property?.featuredImage?.url && !isBlockedRemoteImage(property.featuredImage.url)) {
+    candidates.push(resolveImageUrl(property.featuredImage.url));
   }
 
   if (candidates.length) {

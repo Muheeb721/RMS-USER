@@ -17,8 +17,10 @@ import { increment as incrementView, getCount as getViewCount } from '../utils/p
 import { isVerified as isPropertyVerified } from '../utils/propertyVerificationStorage';
 import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 import authRedirect from '../utils/authRedirect';
+import { getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
 const { Text } = Typography;
 import { toast } from 'react-toastify';
+import { getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
 
 const statusColorMap = {
   Available: 'green',
@@ -71,6 +73,8 @@ function PropertyDetailsPage() {
             title: item.title || item.name || 'Untitled Property',
             description: item.description || '',
             price: item.price || item.rent || item.salePrice || '',
+            rent: item.rent || '',
+            transactionType: item.transactionType || item.listingType || item.purpose || '',
             type: item.type || item.propertyType || item.category || 'Property',
             location: item.location || item.address || '',
             address: item.address || item.location || '',
@@ -254,10 +258,13 @@ function PropertyDetailsPage() {
                 <Button
                   type="primary"
                   onClick={async () => {
+                    const saleProperty = isSaleProperty(property);
                     if (!isAuthenticated) {
-                      const target = `/contact?propertyId=${encodeURIComponent(property.id || property._id || '')}&propertyTitle=${encodeURIComponent(property.title || property.name || '')}&propertyType=${encodeURIComponent(property.type || property.propertyType || '')}`;
+                      const target = saleProperty
+                        ? getSaleInterestRoute(property)
+                        : `/contact?propertyId=${encodeURIComponent(property.id || property._id || '')}&propertyTitle=${encodeURIComponent(property.title || property.name || '')}&propertyType=${encodeURIComponent(property.type || property.propertyType || '')}`;
                       authRedirect.savePendingAction({
-                        action: 'CONTACT_PROPERTY',
+                        action: saleProperty ? 'SALE_INTEREST' : 'CONTACT_PROPERTY',
                         propertyId: property.id || property._id || '',
                         propertyType: property.type || property.propertyType || '',
                         propertyTitle: property.title || property.name || '',
@@ -274,39 +281,20 @@ function PropertyDetailsPage() {
                       console.warn('Save selected property failed, proceeding to contact page', e);
                     }
 
-                    navigate('/contact');
+                    navigate(saleProperty ? getSaleInterestRoute(property) : '/contact');
                   }}
                 >
-                  Contact About This Property
+                  {isSaleProperty(property) ? 'Book Now' : 'Contact About This Property'}
                 </Button>
                 <Button onClick={() => setVisitOpen(true)}>Schedule a Visit</Button>
                 {property.transactionType === 'Rent' && (
                   <Button
                     type="primary"
-                    onClick={async () => {
-                      if (!isAuthenticated) {
-                        const rentRoute = `/rental-application?propertyId=${encodeURIComponent(property.id || property._id || '')}`;
-                        authRedirect.savePendingAction({
-                          action: 'RENT_NOW',
-                          propertyId: property.id || property._id || '',
-                          propertyType: property.type || property.propertyType || '',
-                          propertyTitle: property.title || property.name || '',
-                          returnRoute: rentRoute,
-                        });
-                        navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
-                        return;
-                      }
-                      try {
-                        const m = await import('../utils/selectedPropertyStorage.jsx');
-                        await m.saveSelectedProperty(property);
-                      } catch (e) {
-                        console.warn('Save selected property failed', e);
-                      }
-                      navigate(`/rental-application?propertyId=${property.id}`);
-                    }}
+                    disabled={Boolean(getRentUnavailableStatus(property))}
+                    onClick={() => startRentNow(property, isAuthenticated, navigate)}
                     style={{ background: '#28b463', borderColor: '#28b463' }}
                   >
-                    Rent Now
+                    {getRentUnavailableStatus(property) || 'Rent Now'}
                   </Button>
                 )}
                 <Button onClick={async () => {

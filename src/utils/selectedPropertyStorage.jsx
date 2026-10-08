@@ -13,15 +13,17 @@ const getLocalSelectedProperty = () => {
 };
 
 const setLocalSelectedProperty = (obj) => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return false;
   try {
     if (obj && typeof obj === 'object') {
       window.localStorage.setItem(PREF_KEY, JSON.stringify(obj));
     } else {
       window.localStorage.removeItem(PREF_KEY);
     }
+    return true;
   } catch (e) {
-    // ignore storage failures
+    console.warn('Unable to persist selected property locally', e);
+    return false;
   }
 };
 
@@ -33,7 +35,7 @@ const hasAuthenticatedSession = () => {
 };
 
 export async function saveSelectedProperty(obj) {
-  setLocalSelectedProperty(obj);
+  if (!setLocalSelectedProperty(obj)) return null;
 
   if (!hasAuthenticatedSession()) {
     return obj || null;

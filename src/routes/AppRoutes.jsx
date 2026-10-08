@@ -12,6 +12,7 @@ const ContactPage = lazy(() => import('../pages/ContactPage'));
 const FAQPage = lazy(() => import('../pages/FAQPage'));
 const LoginPage = lazy(() => import('../pages/LoginPage'));
 const AdminLoginPage = lazy(() => import('../pages/AdminLoginPage'));
+const AdminForgotPasswordPage = lazy(() => import('../pages/AdminForgotPasswordPage'));
 const RegisterPage = lazy(() => import('../pages/RegisterPage'));
 const Signup = lazy(() => import('../pages/Signup'));
 const FavoritesPage = lazy(() => import('../pages/FavoritesPage'));
@@ -34,6 +35,7 @@ const ResidentDuesPage = lazy(() => import('../pages/ResidentDuesPage'));
 const MaintenancePage = lazy(() => import('../pages/MaintenancePage'));
 const RentManagementPage = lazy(() => import('../pages/RentManagementPage'));
 const MyRentPage = lazy(() => import('../pages/MyRentPage'));
+const UploadPaymentProof = lazy(() => import('../pages/UploadPaymentProof'));
 const AdminRentPage = lazy(() => import('../pages/AdminRentPage'));
 const AdminApplicationsPage = lazy(() => import('../pages/AdminApplicationsPage'));
 const NotificationsPage = lazy(() => import('../pages/NotificationsPage'));
@@ -45,6 +47,7 @@ const HouseDemoPage = lazy(() => import('../pages/HouseDemoPage'));
 const FlatsDemoPage = lazy(() => import('../pages/FlatsDemoPage'));
 const ApartmentsDemoPage = lazy(() => import('../pages/ApartmentsDemoPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
+const SaleInterestPage = lazy(() => import('../pages/SaleInterestPage'));
 
 function AppRoutes() {
   return (
@@ -52,6 +55,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/admin/login" element={<AdminLoginPage />} />
+        <Route path="/admin/forgot-password" element={<AdminForgotPasswordPage />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -72,6 +76,7 @@ function AppRoutes() {
           <Route path="/saved-searches" element={<SavedSearchesPage />} />
           <Route path="/ai-recommendations" element={<AIRecommendationsPage />} />
           <Route path="/properties/:id" element={<PropertyDetailsPage />} />
+          <Route path="/sale-interest" element={<SaleInterestPage />} />
           <Route path="/hostels" element={<HostelListingsPage />} />
           <Route path="/hostels/:id" element={<HostelDetailsPage />} />
         </Route>
@@ -90,6 +95,7 @@ function AppRoutes() {
           <Route path="/notifications" element={<NotificationsErrorBoundary><NotificationsPage /></NotificationsErrorBoundary>} />
           <Route path="/payments" element={<PaymentsPage />} />
           <Route path="/my-rent" element={<MyRentPage />} />
+          <Route path="/upload-payment-proof" element={<UploadPaymentProof />} />
         </Route>
 
         <Route element={<AdminRoute />}>

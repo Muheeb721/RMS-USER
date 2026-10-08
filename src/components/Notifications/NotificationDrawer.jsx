@@ -7,6 +7,7 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
+import './NotificationDrawer.css';
 
 function NotificationDrawer({
   open,
@@ -15,6 +16,7 @@ function NotificationDrawer({
   onMarkRead,
   onMarkAllRead,
   onDelete,
+  onDownloadAgreement,
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -41,56 +43,56 @@ function NotificationDrawer({
   const getTypeMeta = (type) => {
     switch (type) {
       case 'maintenance':
-        return { icon: <ExclamationCircleOutlined className="text-amber-500" />, color: 'bg-amber-100 text-amber-700' };
+        return { icon: <ExclamationCircleOutlined />, color: 'maintenance' };
       case 'rent':
-        return { icon: <CheckCircleOutlined className="text-emerald-500" />, color: 'bg-emerald-100 text-emerald-700' };
+        return { icon: <CheckCircleOutlined />, color: 'rent' };
       case 'system':
-        return { icon: <InfoCircleOutlined className="text-sky-500" />, color: 'bg-sky-100 text-sky-700' };
+        return { icon: <InfoCircleOutlined />, color: 'system' };
       default:
-        return { icon: <BellOutlined className="text-indigo-500" />, color: 'bg-indigo-100 text-indigo-700' };
+        return { icon: <BellOutlined />, color: 'default' };
     }
   };
 
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-[99998] transition-opacity duration-300"
+        className="rms-notification-overlay"
         onClick={onClose}
         aria-hidden="true"
       />
 
       <aside
-        className="fixed top-0 right-0 h-full w-full md:w-[40vw] max-w-[480px] bg-white shadow-2xl z-[99999] flex flex-col transform transition-transform duration-300 ease-out"
+        className="rms-notification-drawer"
         aria-label="Notifications drawer"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-700">
-              <BellOutlined className="text-lg" />
+        <div className="rms-notification-drawer__header">
+          <div className="rms-notification-drawer__heading">
+            <div className="rms-notification-drawer__bell">
+              <BellOutlined />
             </div>
 
             <div>
-              <h3 className="text-xl font-bold text-slate-900">Notifications</h3>
-              <p className="text-xs text-slate-500">{unreadCount} unread</p>
+              <h3>Notifications</h3>
+              <p>{unreadCount} unread</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            className="rms-notification-drawer__close"
           >
             Close <CloseOutlined />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="rms-notification-drawer__content">
           {notifications.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-slate-500">
+            <div className="rms-notification-drawer__empty">
               No notifications yet.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="rms-notification-drawer__list">
               {notifications.map((notification) => {
                 const isUnread = notification.unread !== false;
                 const meta = getTypeMeta(notification.type);
@@ -98,45 +100,50 @@ function NotificationDrawer({
                 return (
                   <div
                     key={notification.id || `${notification.title}-${notification.createdAt}`}
-                    className={`rounded-2xl border p-4 transition ${
-                      isUnread ? 'border-indigo-200 bg-indigo-50/50' : 'border-slate-200 bg-white'
-                    }`}
+                    className={`rms-notification-card ${isUnread ? 'is-unread' : ''}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${meta.color}`}>
+                    <div className="rms-notification-card__main">
+                      <div className="rms-notification-card__icon">
+                        <span className={`rms-notification-card__icon-type ${meta.color}`}>
                           {meta.icon}
+                        </span>
+                      </div>
+
+                      <div className="rms-notification-card__body">
+                        <div className="rms-notification-card__title">
+                          <p>{notification.title || 'New update'}</p>
+                          {isUnread && (
+                            <span className="rms-notification-card__new">New</span>
+                          )}
                         </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold text-slate-900">{notification.title || 'New update'}</p>
-                            {isUnread && (
-                              <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                                New
-                              </span>
-                            )}
-                          </div>
-
-                          <p className="mt-1 text-sm leading-6 text-slate-600">
-                            {notification.message || notification.body || 'No details available.'}
-                          </p>
-                        </div>
+                        <p className="rms-notification-card__message">
+                          {notification.message || notification.body || 'No details available.'}
+                        </p>
+                        {notification.agreementApplicationId && (
+                          <button
+                            type="button"
+                            onClick={() => onDownloadAgreement?.(notification.agreementApplicationId)}
+                            className="rms-notification-card__agreement"
+                          >
+                            Download rental agreement
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <div className="inline-flex items-center gap-1 text-xs text-slate-500">
+                    <div className="rms-notification-card__footer">
+                      <div className="rms-notification-card__time">
                         <ClockCircleOutlined />
                         {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'Just now'}
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="rms-notification-card__actions">
                         {isUnread && (
                           <button
                             type="button"
                             onClick={() => onMarkRead?.(notification.id)}
-                            className="rounded-full border border-indigo-200 bg-white px-2.5 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                            className="rms-notification-card__action"
                           >
                             Mark read
                           </button>
@@ -145,7 +152,7 @@ function NotificationDrawer({
                         <button
                           type="button"
                           onClick={() => onDelete?.(notification.id)}
-                          className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          className="rms-notification-card__action"
                         >
                           Delete
                         </button>
@@ -158,11 +165,11 @@ function NotificationDrawer({
           )}
         </div>
 
-        <div className="border-t border-slate-200 bg-white p-4">
+        <div className="rms-notification-drawer__footer">
           <button
             type="button"
             onClick={onMarkAllRead}
-            className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="rms-notification-drawer__mark-all"
           >
             Mark all as read
           </button>

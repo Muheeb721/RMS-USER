@@ -27,12 +27,24 @@ function RegisterPage() {
     setLoading(true);
 
     try {
+      if (String(values.password || '').length < 8) {
+        throw new Error('Password must be at least 8 characters long.');
+      }
+      if (String(values.password || '') !== String(values.confirmPassword || '')) {
+        throw new Error('Passwords do not match.');
+      }
+
       const payload = {
         name: sanitizeFullName(values.fullName) || (values.email ? values.email.split('@')[0].replace(/[._-]/g, ' ').trim() : 'RMS User'),
         email: String(values.email || '').trim(),
         phone: String(values.phone || '').trim(),
         password: String(values.password || ''),
+        confirmPassword: String(values.confirmPassword || ''),
         role: values.role || 'resident',
+        profileData: {
+          phone: String(values.phone || '').trim(),
+          fullName: sanitizeFullName(values.fullName) || (values.email ? values.email.split('@')[0].replace(/[._-]/g, ' ').trim() : 'RMS User'),
+        },
       };
 
       const response = await authService.signup(payload);
@@ -110,6 +122,24 @@ function RegisterPage() {
           </Form.Item>
           <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Please enter your password' }]}>
             <Input.Password placeholder="Enter password" />
+          </Form.Item>
+          <Form.Item
+            label="Confirm Password"
+            name="confirmPassword"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: 'Please confirm your password' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Passwords do not match.'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password placeholder="Confirm password" />
           </Form.Item>
           <Button type="primary" htmlType="submit" block loading={loading}>
             Create Account

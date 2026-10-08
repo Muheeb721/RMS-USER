@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Spin, Alert } from 'antd';
 import { Link } from "react-router-dom";
 import { useDispatch, useSelector } from 'react-redux';
@@ -160,7 +160,6 @@ function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedNotification, setSelectedNotification] = useState(null);
-  const loadOnceRef = useRef(false);
   const authKey = `${Boolean(isAuthenticated)}-${user?.email || user?.id || 'guest'}`;
 
   useEffect(() => {
@@ -172,12 +171,6 @@ function NotificationsPage() {
       setError(null);
       return undefined;
     }
-
-    if (loadOnceRef.current && loadOnceRef.current === authKey) {
-      return undefined;
-    }
-
-    loadOnceRef.current = authKey;
 
     let mounted = true;
     const load = async () => {

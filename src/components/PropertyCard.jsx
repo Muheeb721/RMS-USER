@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import api from '../services/api';
 import favoriteService from '../services/favoriteService';
 import { useAuth } from '../contexts/AuthContext';
+import { getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
 
 const DEFAULT_STATUS = {
   Available: 'success',
@@ -41,13 +42,14 @@ function PropertyCard({ property, onSavedChange }) {
   const redirectTarget = useMemo(() => `/properties/${propertyId}`, [propertyId]);
 
   const handleView = () => {
+    const targetRoute = isSaleProperty(property) ? getSaleInterestRoute(property) : redirectTarget;
     if (!isAuthenticated) {
-      const next = encodeURIComponent(redirectTarget);
+      const next = encodeURIComponent(targetRoute);
       navigate(`/login?redirect=${next}`);
       return;
     }
 
-    navigate(redirectTarget);
+    navigate(targetRoute);
   };
 
   const handleContactOpen = () => {

@@ -28,11 +28,14 @@ function AdminLoginPage() {
 
       const data = response?.data?.data || response?.data || {};
       const token = data.token || '';
+      if (String(data.user?.role || '').toLowerCase() !== 'admin') {
+        throw new Error('This account does not have admin access.');
+      }
       const user = {
-        id: data.user?.id || data._id || 'admin-user',
+        id: data.user?.id || data.user?._id || data._id,
         name: data.user?.name || 'Admin User',
         email: data.user?.email || values.email,
-        role: 'admin',
+        role: data.user.role,
       };
 
       if (!token) {
@@ -58,9 +61,15 @@ function AdminLoginPage() {
           <p style={{ margin: 0, color: '#667085' }}>Use your administrator account to continue.</p>
         </div>
 
+        {location.state?.passwordResetMessage && (
+          <div role="status" style={{ marginBottom: 16, color: '#15803d', textAlign: 'center' }}>
+            {location.state.passwordResetMessage}
+          </div>
+        )}
+
         <Form layout="vertical" onFinish={handleSubmit}>
           <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Enter a valid email' }]}>
-            <Input size="large" placeholder="admin@rms.com" />
+            <Input size="large" placeholder="admin@rental.com" />
           </Form.Item>
 
           <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Password is required' }]}>
@@ -71,6 +80,9 @@ function AdminLoginPage() {
             Sign in as admin
           </Button>
 
+          <div style={{ marginTop: 12, textAlign: 'center' }}>
+            <Link to="/admin/forgot-password" style={{ color: '#123a70', fontWeight: 600 }}>Forgot Password?</Link>
+          </div>
           <div style={{ marginTop: 16, textAlign: 'center' }}>
             <Link to="/login" style={{ color: '#123a70', fontWeight: 600 }}>Return to user login</Link>
           </div>

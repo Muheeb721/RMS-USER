@@ -18,6 +18,9 @@ import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { getPrimaryImage } from '../utils/imageUtils';
 import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 import authRedirect from '../utils/authRedirect';
+import { getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
+import { useAuth } from '../contexts/AuthContext';
+import { getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
 
 const { Paragraph } = Typography;
 
@@ -47,7 +50,9 @@ function PropertyListingsPage() {
     })();
     return () => { mounted = false; };
   }, []);
-  const { user } = useSelector((state) => state.auth || {});
+  const { user: authUser, isAuthenticated } = useAuth();
+  const { user: reduxUser } = useSelector((state) => state.auth || {});
+  const user = authUser || reduxUser;
 
   const selectedArea = searchParams.get('area') || 'All Areas';
   const areaOptions = useMemo(() => {
@@ -97,7 +102,7 @@ function PropertyListingsPage() {
   };
 
   const handleProtectedNavigation = (targetUrl, action = 'GENERAL_ACTION', item = null) => {
-    if (!user?.isLoggedIn) {
+    if (!isAuthenticated) {
       authRedirect.savePendingAction({
         action,
         propertyId: item?.id || item?._id || '',
@@ -330,35 +335,19 @@ function PropertyListingsPage() {
                       <div className="property-cover">
                         <img alt={property.title} src={cardImage} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
                         <div className="cover-actions">
-                          <Button type="primary" icon={<EyeOutlined />} onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/properties/${property.id}`); }}>View</Button>
+                          <Button type="primary" icon={<EyeOutlined />} onClick={() => {
+                            const target = isSaleProperty(property) ? getSaleInterestRoute(property) : `/properties/${property.id}`;
+                            handleProtectedNavigation(target, isSaleProperty(property) ? 'SALE_INTEREST' : 'GENERAL_ACTION', property);
+                          }}>View</Button>
                           <Button onClick={() => { import('../utils/selectedPropertyStorage.jsx').then(m => m.saveSelectedProperty(property)); handleProtectedNavigation(`/contact?propertyId=${property.id}&propertyTitle=${encodeURIComponent(property.title || '')}&propertyType=${encodeURIComponent(property.type || '')}`, 'CONTACT_PROPERTY', property); }}>Contact</Button>
                           {property.transactionType === 'Rent' && (
                             <Button
                               type="primary"
                               style={{ background: '#28b463', borderColor: '#28b463' }}
-                              onClick={async () => {
-                                if (!user?.isLoggedIn) {
-                                  const rentRoute = `/rental-application?propertyId=${encodeURIComponent(property.id)}`;
-                                  authRedirect.savePendingAction({
-                                    action: 'RENT_NOW',
-                                    propertyId: property.id || property._id || '',
-                                    propertyType: property.type || property.propertyType || '',
-                                    propertyTitle: property.title || property.name || '',
-                                    returnRoute: rentRoute,
-                                  });
-                                  navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
-                                  return;
-                                }
-                                try {
-                                  const m = await import('../utils/selectedPropertyStorage.jsx');
-                                  await m.saveSelectedProperty(property);
-                                } catch (e) {
-                                  console.warn('Save selected property failed', e);
-                                }
-                                navigate(`/rental-application?propertyId=${property.id}`);
-                              }}
+                              disabled={Boolean(getRentUnavailableStatus(property))}
+                              onClick={() => startRentNow(property, isAuthenticated, navigate)}
                             >
-                              Rent Now
+                              {getRentUnavailableStatus(property) || 'Rent Now'}
                             </Button>
                           )}
                         </div>

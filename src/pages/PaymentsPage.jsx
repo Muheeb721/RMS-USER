@@ -150,8 +150,6 @@ function PaymentsPage() {
               <Select>
                 <Select.Option value="Cash">Cash</Select.Option>
                 <Select.Option value="Bank Transfer">Bank Transfer</Select.Option>
-                <Select.Option value="JazzCash">JazzCash</Select.Option>
-                <Select.Option value="Easypaisa">Easypaisa</Select.Option>
                 <Select.Option value="Card">Card</Select.Option>
                 <Select.Option value="Other">Other</Select.Option>
               </Select>

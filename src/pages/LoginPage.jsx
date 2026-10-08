@@ -20,6 +20,16 @@ const resolveDashboardRoute = (role, fallback = '/') => {
   return ['admin', 'owner', 'manager'].includes(normalizedRole) ? '/admin' : fallback;
 };
 
+const getSafeRedirect = (value, fallback = '/') => {
+  if (!value || typeof value !== 'string') return fallback;
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 const featureHighlights = [
   {
     icon: FiHome,
@@ -51,12 +61,7 @@ function LoginPage() {
     const target = params.get('redirect');
     if (!target) return '/';
 
-    try {
-      const decoded = decodeURIComponent(target);
-      return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/';
-    } catch (error) {
-      return '/';
-    }
+    return getSafeRedirect(target);
   })();
 
   useEffect(() => {
@@ -84,7 +89,17 @@ function LoginPage() {
             const ok = Boolean(meRes && (meRes.success || meRes.data));
           if (ok) {
             const userData = meRes.data || {};
-            navigate(resolveDashboardRoute(window.localStorage.getItem('rms_user_role') || userData.role || 'resident', '/dashboard'), { replace: true });
+            const pendingAction = authRedirect.consumePendingAction();
+            const pendingRoute = pendingAction?.returnRoute || '';
+            const requestedRoute = getSafeRedirect(
+              pendingRoute || (redirectPath !== '/' ? redirectPath : ''),
+              '',
+            );
+            const fallbackRoute = resolveDashboardRoute(
+              window.localStorage.getItem('rms_user_role') || userData.role || 'resident',
+              '/dashboard',
+            );
+            navigate(requestedRoute || fallbackRoute, { replace: true });
             return;
           }
         } catch (err) {
@@ -203,10 +218,11 @@ function LoginPage() {
       form.resetFields();
       toast.success(`Welcome back, ${sessionUser.name}!`);
       const pendingAction = authRedirect.consumePendingAction();
+      const pendingRoute = getSafeRedirect(pendingAction?.returnRoute || '', '');
       const resolvedRedirect = redirectPath && redirectPath !== '/login' && redirectPath !== '/signup' && redirectPath !== '/register'
-        ? redirectPath
+        ? getSafeRedirect(redirectPath, '/')
         : resolveDashboardRoute(sessionUser.role, '/dashboard');
-      const finalRedirect = pendingAction?.returnRoute || resolvedRedirect;
+      const finalRedirect = pendingRoute || resolvedRedirect;
 
       navigate(finalRedirect, { replace: true });
     } catch (error) {
@@ -272,19 +288,30 @@ function LoginPage() {
 
           <Form form={form} layout="vertical" className="auth-form" onFinish={handleSubmit}>
             <Form.Item
-              label="Email Address"
+                label="Email or Username"
               name="email"
               rules={[
-                { required: true, message: 'Please enter your email' },
-                { type: 'email', message: 'Please enter a valid email' },
-              ]}
-            >
-              <Input
-                prefix={<FiMail className="auth-input-icon" />}
-                placeholder="Enter your email"
-                size="large"
-              />
-            </Form.Item>
+                  {
+                    required: true,
+                    message: 'Please enter your email or username',
+                  },
+                  {
+                    validator: (_, value) => {
+                      const cleaned = String(value || '').trim();
+                      if (!cleaned) {
+                        return Promise.reject(new Error('Please enter your email or username'));
+                      }
+                      return Promise.resolve();
+                    },
+                  },
+                ]}
+              >
+                <Input
+                  prefix={<FiMail className="auth-input-icon" />}
+                  placeholder="Enter your email or username"
+                  size="large"
+                />
+              </Form.Item>
 
             <Form.Item
               label={
@@ -309,7 +336,12 @@ function LoginPage() {
               <Checkbox checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)}>
                 Remember Me
               </Checkbox>
-              <Link to="/signup" className="auth-link">
+              <Link
+                to={redirectPath && redirectPath !== '/'
+                  ? `/signup?redirect=${encodeURIComponent(redirectPath)}`
+                  : '/signup'}
+                className="auth-link"
+              >
                 Need an account? Sign up
               </Link>
             </div>
@@ -317,18 +349,6 @@ function LoginPage() {
             <Button type="primary" htmlType="submit" className="auth-submit" loading={loading} size="large">
               Login <FiArrowRight />
             </Button>
-
-            <div className="auth-divider">or continue with</div>
-
-            <div className="auth-socials">
-              <button type="button" className="auth-social-btn">
-                Continue with Google
-              </button>
-              <button type="button" className="auth-social-btn">
-                Continue with Facebook
-              </button>
-              {/* TODO: Integrate Google/Facebook OAuth in a future iteration. */}
-            </div>
           </Form>
 
           <div className="auth-footer">

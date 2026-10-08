@@ -15,24 +15,32 @@ function TenantProfilePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState(null);
+  const [savedImages, setSavedImages] = useState({ profileImage: '', cnicImage: '' });
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [cnicImageFile, setCnicImageFile] = useState(null);
   const [error, setError] = useState(null);
   const [profileImagePreview, setProfileImagePreview] = useState('');
   const [cnicImagePreview, setCnicImagePreview] = useState('');
 
   const returnTo = useMemo(() => {
     const route = searchParams.get('returnTo');
-    if (!route) return '/my-rent';
-    try {
-      const decoded = decodeURIComponent(route);
-      return decoded.startsWith('/') && !decoded.startsWith('//') ? decoded : '/my-rent';
-    } catch (error) {
-      return '/my-rent';
+    if (!route) {
+      const selectedId = searchParams.get('propertyId');
+      return selectedId
+        ? `/rental-application?propertyId=${encodeURIComponent(selectedId)}`
+        : '/my-rent';
     }
+    return route.startsWith('/') && !route.startsWith('//') ? route : '/my-rent';
   }, [searchParams]);
 
   const propertyId = searchParams.get('propertyId') || '';
   const propertyTitle = searchParams.get('propertyTitle') || '';
   const propertyType = searchParams.get('propertyType') || '';
+
+  useEffect(() => () => {
+    if (profileImagePreview.startsWith('blob:')) URL.revokeObjectURL(profileImagePreview);
+    if (cnicImagePreview.startsWith('blob:')) URL.revokeObjectURL(cnicImagePreview);
+  }, [profileImagePreview, cnicImagePreview]);
 
   useEffect(() => {
     if (!user?.email && !user?.id) {
@@ -44,28 +52,42 @@ function TenantProfilePage() {
     (async () => {
       setLoading(true);
       setError(null);
+      let rentalProfile = null;
       try {
         const response = await api.request('/tenant-profiles/me');
         if (response?.success && response.data) {
-          setProfile(response.data);
-          const profileImage = response.data.profileImage || response.data.image || '';
-          const cnicImage = response.data.cnicImage || response.data.idCardImage || '';
-          setProfileImagePreview(profileImage);
-          setCnicImagePreview(cnicImage);
+          rentalProfile = response.data;
+          setProfile(rentalProfile);
           form.setFieldsValue({
-            fullName: response.data.fullName || user.name || '',
-            email: response.data.email || user.email || '',
-            phone: response.data.phone || user.phone || '',
-            address: response.data.currentAddress || response.data.address || '',
-            city: response.data.city || '',
-            occupation: response.data.occupation || '',
-            emergencyContact: response.data.emergencyContactName || '',
-            emergencyContactNumber: response.data.emergencyContactPhone || '',
+            fullName: rentalProfile.fullName || user.name || '',
+            email: rentalProfile.email || user.email || '',
+            phone: rentalProfile.phone || user.phone || '',
+            address: rentalProfile.currentAddress || rentalProfile.address || '',
+            city: rentalProfile.city || '',
+            occupation: rentalProfile.occupation || '',
+            emergencyContact: rentalProfile.emergencyContactName || '',
+            emergencyContactNumber: rentalProfile.emergencyContactPhone || '',
           });
         }
       } catch (err) {
         // no existing profile yet; keep empty form
       } finally {
+        try {
+          const userResponse = await api.request('/users/profile');
+          const userProfile = userResponse?.data?.profile || {};
+          const profileImage = rentalProfile?.profileImage || rentalProfile?.image || userProfile.profileImage || userResponse?.data?.profileImage || '';
+          const cnicImage = rentalProfile?.cnicImage || rentalProfile?.idCardImage || userProfile.cnicImage || '';
+          setSavedImages({ profileImage, cnicImage });
+          setProfileImagePreview(profileImage);
+          setCnicImagePreview(cnicImage);
+        } catch (imageError) {
+          console.warn('Unable to load existing rental profile images', imageError);
+          const profileImage = rentalProfile?.profileImage || rentalProfile?.image || '';
+          const cnicImage = rentalProfile?.cnicImage || rentalProfile?.idCardImage || '';
+          setSavedImages({ profileImage, cnicImage });
+          setProfileImagePreview(profileImage);
+          setCnicImagePreview(cnicImage);
+        }
         setLoading(false);
       }
     })();
@@ -77,9 +99,6 @@ function TenantProfilePage() {
 
     try {
       const formData = new FormData();
-      const profileFile = values.profileImageFile;
-      const cnicFile = values.cnicImageFile;
-
       formData.append('fullName', values.fullName?.trim() || '');
       formData.append('email', (values.email || user.email || '').trim());
       formData.append('phone', values.phone?.trim() || '');
@@ -88,30 +107,59 @@ function TenantProfilePage() {
       formData.append('occupation', values.occupation?.trim() || '');
       formData.append('emergencyContactName', values.emergencyContact?.trim() || '');
       formData.append('emergencyContactPhone', values.emergencyContactNumber?.trim() || '');
-      formData.append('propertyId', propertyId || '');
-      formData.append('propertyName', propertyTitle || '');
-      formData.append('propertyType', propertyType || '');
-      formData.append('status', 'Pending');
+      formData.append('profileImage', savedImages.profileImage);
+      formData.append('cnicImage', savedImages.cnicImage);
 
-      if (profileFile instanceof File) {
-        formData.append('profileImage', profileFile);
+      if (profileImageFile instanceof File) {
+        formData.append('profileImage', profileImageFile);
       }
-      if (cnicFile instanceof File) {
-        formData.append('cnicImage', cnicFile);
+      if (cnicImageFile instanceof File) {
+        formData.append('cnicImage', cnicImageFile);
       }
 
       const response = await api.request('/users/profile', {
         method: 'PUT',
         data: formData,
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
       });
 
       if (!response || !response.success) {
-        throw new Error(response?.message || 'Unable to save rental profile.');
+        throw new Error(response?.message || 'Unable to upload rental profile images.');
       }
 
+      const userProfile = response.data?.profile || {};
+      const profileImage = userProfile.profileImage || response.data?.profileImage || savedImages.profileImage;
+      const cnicImage = userProfile.cnicImage || savedImages.cnicImage;
+      setSavedImages({ profileImage, cnicImage });
+      setProfileImagePreview(profileImage);
+      setCnicImagePreview(cnicImage);
+      setProfileImageFile(null);
+      setCnicImageFile(null);
+
+      const rentalProfileResponse = await api.request('/tenant-profiles', {
+        method: 'POST',
+        body: {
+          fullName: values.fullName?.trim() || '',
+          email: (values.email || user.email || '').trim(),
+          phone: values.phone?.trim() || '',
+          profileImage,
+          cnicImage,
+          currentAddress: values.address?.trim() || '',
+          city: values.city?.trim() || '',
+          occupation: values.occupation?.trim() || '',
+          emergencyContactName: values.emergencyContact?.trim() || '',
+          emergencyContactPhone: values.emergencyContactNumber?.trim() || '',
+          propertyId: propertyId || profile?.propertyId || '',
+          propertyName: propertyTitle || profile?.propertyName || '',
+          propertyType: propertyType || profile?.propertyType || '',
+          status: profile?.status || 'Pending',
+        },
+      });
+
+      if (!rentalProfileResponse?.success || !rentalProfileResponse.data) {
+        throw new Error(rentalProfileResponse?.message || 'Unable to save rental profile.');
+      }
+
+      setProfile(rentalProfileResponse.data);
       toast.success(profile ? 'Rental profile updated.' : 'Rental profile created successfully.');
       navigate(returnTo, { replace: true });
     } catch (err) {
@@ -126,7 +174,8 @@ function TenantProfilePage() {
   if (loading) {
     return (
       <div style={{ minHeight: 260, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" tip="Loading rental profile..." />
+        <Form form={form} style={{ display: 'none' }} />
+        <Spin size="large" description="Loading rental profile..." />
       </div>
     );
   }
@@ -181,22 +230,32 @@ function TenantProfilePage() {
 
           <Row gutter={16}>
             <Col xs={24} md={12}>
-              <Form.Item label="Profile Photo" name="profileImageFile" valuePropName="fileList" getValueFromEvent={(event) => {
-                const file = event?.target?.files?.[0];
-                return file || null;
-              }}>
-                <input type="file" accept="image/*" />
+              <Form.Item label="Profile Photo">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setProfileImageFile(file);
+                    setProfileImagePreview(file ? URL.createObjectURL(file) : savedImages.profileImage);
+                  }}
+                />
               </Form.Item>
               {profileImagePreview && (
                 <img src={profileImagePreview} alt="Profile preview" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} />
               )}
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item label="CNIC/ID Photo" name="cnicImageFile" valuePropName="fileList" getValueFromEvent={(event) => {
-                const file = event?.target?.files?.[0];
-                return file || null;
-              }}>
-                <input type="file" accept="image/*" />
+              <Form.Item label="CNIC/ID Photo">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    setCnicImageFile(file);
+                    setCnicImagePreview(file ? URL.createObjectURL(file) : savedImages.cnicImage);
+                  }}
+                />
               </Form.Item>
               {cnicImagePreview && (
                 <img src={cnicImagePreview} alt="CNIC preview" style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} />

@@ -7,15 +7,15 @@ import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import { increment as incrementPropertyView, getCount as getPropertyViewCount } from '../utils/propertyViewsStorage.jsx';
 import { recordAdminAction } from '../services/adminActivityService.jsx';
+import { resolveImageUrl } from '../utils/imageUrl';
 
 const STORAGE_KEY = "rms_properties";
-const FALLBACK_IMAGE =
-  "https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80";
 
 const isBlockedRemoteImage = (src = '') => {
   if (!src || typeof src !== 'string') return true;
   if (src.startsWith('data:image/')) return false;
   if (src.startsWith('/')) return false;
+  if (/^https?:\/\/source\.unsplash\.com\//i.test(src)) return true;
   if (src.startsWith('http://') || src.startsWith('https://')) return false;
   return false;
 };
@@ -61,7 +61,7 @@ const normalizeGeneratedImage = (value, type = 'Property', title = 'Property', i
   if (!value || typeof value !== 'string') return buildGeneratedPropertyArt(type, title, index);
   if (value.startsWith('data:image/')) return value;
   if (isBlockedRemoteImage(value)) return buildGeneratedPropertyArt(type, title, index);
-  return value;
+  return resolveImageUrl(value);
 };
 
 const normalizePropertyState = (rawStatus) => {
@@ -87,81 +87,40 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
       if (typeof it === 'object' && it.url) return it.url;
       return null;
     }).filter(Boolean);
-  } else if (item.image) {
-    imagesRaw = [item.image];
+  } else if (item.image || item.featuredImage?.url) {
+    imagesRaw = [item.image || item.featuredImage.url];
   }
-
-  // Generate unique, type-appropriate image arrays when none are provided.
-  // Prefer local curated images placed under `/public/images/{category}/` using the
-  // naming convention: `{propertyId}-1.jpg`, `{propertyId}-2.jpg`, ...
-  // If local assets are not present at runtime, the browser will fallback via img onError.
-  // We also append Unsplash fallbacks so the UI remains populated during initial setup.
-  const generateImagesFor = (type, id, count = 6) => {
-    const normalized = String(type || 'property').trim().toLowerCase();
-    const folder = normalized.includes('house') ? 'houses'
-      : normalized.includes('apartment') ? 'apartments'
-      : normalized.includes('flat') ? 'flats'
-      : normalized.includes('hostel') ? 'hostels'
-      : normalized.includes('room') ? 'rooms'
-      : 'properties';
-
-    const results = [];
-
-    // Local naming convention: /images/{folder}/{id}-{index}.jpg
-    for (let i = 1; i <= count; i++) {
-      results.push(`/images/${folder}/${id}-${i}.jpg`);
-    }
-
-    // Also add a few unsplash fallbacks (kept as last-resort fallback)
-    const keyword = normalized || 'property';
-    for (let i = 0; i < 3; i++) {
-      const sig = encodeURIComponent(`${id}-fallback-${i}`);
-      results.push(`https://source.unsplash.com/1200x800/?${keyword}&sig=${sig}`);
-    }
-
-    return results;
-  };
-
-  // decide how many images are desirable per type
-  const desiredCountMap = {
-    House: 8,
-    Apartment: 6,
-    Flat: 6,
-    Hostel: 6,
-    Room: 5,
-  };
 
   const effectiveType = item.type || item.propertyType || item.category || 'Property';
-  const desiredCount = desiredCountMap[effectiveType] || 6;
-
-  // start with any provided images (or single image) then fill with generated, type-appropriate images
-  const fillers = generateImagesFor(effectiveType, fallbackId, desiredCount);
   const merged = [];
-  // add provided images first (if any) but skip any already used as a cover for another property
+  // Property images come only from the persisted API fields.
   for (const src of imagesRaw) {
     if (!src) continue;
-    if (usedImages && usedImages.has(src)) {
-      // skip provided src to avoid duplicate cover images across properties
-      continue;
-    }
     if (!merged.includes(src)) merged.push(src);
   }
-  // append fillers until we reach desiredCount
-  for (let i = 0; merged.length < desiredCount && i < fillers.length; i++) {
-    if (!merged.includes(fillers[i])) merged.push(fillers[i]);
-  }
-  // ensure at least one fallback image
-  if (!merged.length) merged.push(FALLBACK_IMAGE);
+  // Placeholder is only for records with no stored image.
+  if (!merged.length) merged.push(buildGeneratedPropertyArt(effectiveType, item.title || 'Property', fallbackId));
 
-  const images = merged.map((src) => normalizeGeneratedImage(src, effectiveType, item.title || 'Property', fallbackId));
+  const cacheVersion = item.updatedAt ? new Date(item.updatedAt).getTime() : '';
+  const images = merged.map((src) => {
+    const normalized = normalizeGeneratedImage(src, effectiveType, item.title || 'Property', fallbackId);
+    if (!cacheVersion || normalized.startsWith('data:') || normalized.includes('?')) return normalized;
+    return `${normalized}?v=${cacheVersion}`;
+  });
 
   const videos = Array.isArray(item.videos) && item.videos.length ? item.videos : (item.video ? [item.video] : []);
   const media3d = Array.isArray(item.media3d) && item.media3d.length ? item.media3d : (item.model3d ? [item.model3d] : []);
 
   // pick cover image; prefer provided item.image if it wasn't skipped
-  let image = item.image && !usedImages?.has(item.image) && !isBlockedRemoteImage(item.image)
-    ? normalizeGeneratedImage(item.image, effectiveType, item.title || 'Property', fallbackId)
+  const rawCoverImage = typeof item.image === 'object'
+    ? item.image?.url
+    : item.image || item.featuredImage?.url;
+  let image = rawCoverImage && !usedImages?.has(rawCoverImage) && !isBlockedRemoteImage(rawCoverImage)
+    ? normalizeGeneratedImage(rawCoverImage, effectiveType, item.title || 'Property', fallbackId)
     : images[0] || buildGeneratedPropertyArt(effectiveType, item.title || 'Property', fallbackId);
+  if (cacheVersion && image && !image.startsWith('data:') && !image.includes('?')) {
+    image = `${image}?v=${cacheVersion}`;
+  }
   // mark the chosen cover as used to prevent reuse across properties
   try { if (usedImages && image) usedImages.add(image); } catch (e) {}
 
@@ -178,8 +137,10 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
     rentPrice: item.rentPrice || item.price || "",
     salePrice: item.salePrice || "",
     type: item.type || "Property",
+    listingType: item.listingType || item.listing_type || item.transactionType || item.purpose || "",
     transactionType: (
       item.transactionType ||
+      item.listingType ||
       (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : undefined)) ||
       (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : 'Sale'))
     ),
@@ -262,7 +223,7 @@ export function PropertyProvider({ children }) {
           setProperties(res.data.map((p, i) => normalizeProperty(p, i + 1, usedImages)));
           backendOffline = false;
           if (!timer) {
-            timer = window.setInterval(loadProperties, 20000);
+            timer = window.setInterval(loadProperties, 5000);
           }
           return;
         }
@@ -279,11 +240,21 @@ export function PropertyProvider({ children }) {
       }
     };
 
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') {
+        loadProperties();
+      }
+    };
+
+    window.addEventListener('focus', refreshWhenVisible);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
     loadProperties();
 
     return () => {
       mounted = false;
       stopPolling();
+      window.removeEventListener('focus', refreshWhenVisible);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, []);
 

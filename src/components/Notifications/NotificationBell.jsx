@@ -1,143 +1,177 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from 'antd';
 import { BellOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useRef } from 'react';
+import { io } from 'socket.io-client';
 import { toast } from 'react-toastify';
 import NotificationDrawer from './NotificationDrawer';
-import { markAllNotificationsAsRead, markNotificationAsRead, removeNotification, setNotifications } from '../../redux/store';
-import { markNotificationAsReadOnServer } from '../../services/notificationService.jsx';
-import { getUnreadCountFromServer, readSessionUser } from '../../services/notificationService.jsx';
+import {
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  removeNotification,
+  setNotifications,
+} from '../../redux/store';
+import {
+  deleteNotificationOnServer,
+  downloadRentalAgreement,
+  fetchNotificationsFromServer,
+  getUnreadCountFromServer,
+  markAllNotificationsOnServer,
+  markNotificationAsReadOnServer,
+  readSessionUser,
+} from '../../services/notificationService.jsx';
 
 function NotificationBell() {
-  const navigate = useNavigate();
-  const location = useLocation();
   const dispatch = useDispatch();
   const notifications = useSelector((state) => Array.isArray(state.auth?.notifications) ? state.auth.notifications : []);
   const [isOpen, setIsOpen] = useState(false);
   const [serverUnread, setServerUnread] = useState(null);
-  const unreadFetchRef = useRef('');
-
+  const session = readSessionUser();
+  const sessionKey = useMemo(
+    () => `${session?.email || session?.id || session?.userId || ''}-${session?.role || 'user'}`,
+    [session?.email, session?.id, session?.userId, session?.role],
+  );
   const unreadCount = notifications.filter((item) => item.unread !== false).length;
 
-  const handleOpen = () => {
-    const session = readSessionUser();
-    const isAdmin = session?.role === 'admin';
-
-    if (location.pathname === '/notifications' || (isAdmin && location.pathname === '/admin/notifications')) {
-      setIsOpen((prev) => !prev);
-      return;
+  useEffect(() => {
+    if (!sessionKey || sessionKey.startsWith('-')) {
+      setServerUnread(null);
+      return undefined;
     }
 
-    if (!session?.email) {
-      toast.info('Open notifications is available. Please log in to sync your personal alerts.');
-      navigate('/notifications');
-      return;
-    }
-
-    setIsOpen(true);
-    if (session?.role === 'admin') navigate('/admin/notifications');
-    else navigate('/notifications');
-  };
+    let active = true;
+    getUnreadCountFromServer().then((response) => {
+      if (active && response?.success) setServerUnread(response.data?.count ?? 0);
+    });
+    return () => { active = false; };
+  }, [sessionKey]);
 
   useEffect(() => {
-    const session = readSessionUser();
-    const authReady = Boolean(session?.email || session?.role);
+    if (!isOpen) return undefined;
 
-    if (!authReady || location.pathname === '/notifications') {
-      setServerUnread(0);
-      unreadFetchRef.current = '';
+    const sessionUser = readSessionUser();
+    if (!sessionUser?.email && !sessionUser?.id && !sessionUser?.userId) {
       return undefined;
     }
 
-    const cacheKey = `${session.email || 'unknown'}-${session.role || 'user'}`;
-    if (unreadFetchRef.current === cacheKey) {
-      return undefined;
+    let active = true;
+    const loadNotifications = async () => {
+      const response = await fetchNotificationsFromServer();
+      if (!active) return;
+      if (!response?.success || !Array.isArray(response.data)) {
+        toast.warn('Unable to load server notifications. Showing notifications already available in this session.');
+        return;
+      }
+
+      dispatch(setNotifications(response.data));
+      setServerUnread(response.data.filter((notification) => notification.unread !== false).length);
+    };
+
+    loadNotifications().catch((error) => {
+      console.error('Unable to load notifications when opening the drawer', error);
+      if (active) toast.warn('Unable to sync notifications from server.');
+    });
+
+    return () => { active = false; };
+  }, [dispatch, isOpen]);
+
+  useEffect(() => {
+    const sessionUser = readSessionUser();
+    const userId = sessionUser?.id || sessionUser?.userId;
+    if (!userId) return undefined;
+
+    const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+    const socket = io(socketUrl, {
+      autoConnect: true,
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+      auth: {
+        token: window.__RMS_AUTH_TOKEN || window.localStorage.getItem('rms_token') || window.__rms_inmemory_token || '',
+        userId,
+        role: sessionUser.role || 'user',
+      },
+    });
+
+    socket.emit('join-user', {
+      userId,
+      userRole: sessionUser.role || 'user',
+    });
+    socket.on('notification:new', async () => {
+      const response = await getUnreadCountFromServer();
+      if (response?.success) setServerUnread(response.data?.count ?? 0);
+      if (isOpen) {
+        const latest = await fetchNotificationsFromServer();
+        if (latest?.success && Array.isArray(latest.data)) dispatch(setNotifications(latest.data));
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [dispatch, isOpen, sessionKey]);
+
+  const handleMarkRead = async (id) => {
+    const response = await markNotificationAsReadOnServer(id);
+    if (!response?.success) {
+      toast.warn('Unable to mark this notification as read on the server.');
+      return;
     }
 
-    unreadFetchRef.current = cacheKey;
-
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await getUnreadCountFromServer();
-        if (mounted) {
-          if (res && res.success) setServerUnread(res.data?.count ?? 0);
-          else {
-            setServerUnread(0);
-            toast.warn('Unable to sync notifications from server. Showing local notifications only.');
-          }
-        }
-      } catch (e) {
-        console.warn('Unread count fetch failed', e);
-        if (mounted) {
-          setServerUnread(0);
-          toast.warn('Unable to sync notifications from server. Check backend connection.');
-        }
-      }
-    })();
-
-    return () => { mounted = false; };
-  }, [location.pathname]);
-
-  const handleMarkRead = (id) => {
-    (async () => {
-      try {
-        const res = await markNotificationAsReadOnServer(id);
-        if (res && res.success !== false && res.data) {
-          dispatch(markNotificationAsRead(id));
-        } else {
-          // Fallback to local mark
-          dispatch(markNotificationAsRead(id));
-        }
-      } catch (e) {
-        dispatch(markNotificationAsRead(id));
-      }
-    })();
+    dispatch(markNotificationAsRead(id));
+    setServerUnread((current) => current === null ? current : Math.max(0, current - 1));
   };
 
-  const handleMarkAllRead = () => {
-    // Attempt to mark each unread notification on the server, then update local store
-    (async () => {
-      const unread = notifications.filter((n) => n.unread !== false).map((n) => n.id || n._id);
-      for (const id of unread) {
-        try {
-          await markNotificationAsReadOnServer(id);
-        } catch (e) {
-          // ignore per-item errors
-        }
-      }
-      dispatch(markAllNotificationsAsRead());
-    })();
+  const handleMarkAllRead = async () => {
+    const response = await markAllNotificationsOnServer();
+    if (!response?.success) {
+      toast.warn('Unable to mark notifications as read on the server.');
+      return;
+    }
+
+    dispatch(markAllNotificationsAsRead());
+    setServerUnread(0);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    const response = await deleteNotificationOnServer(id);
+    if (!response?.success) {
+      toast.warn('Unable to delete this notification on the server.');
+      return;
+    }
+
     dispatch(removeNotification(id));
+  };
+
+  const handleDownloadAgreement = async (applicationId) => {
+    try {
+      await downloadRentalAgreement(applicationId);
+    } catch (error) {
+      console.error('Unable to download rental agreement:', error);
+      toast.warn('Unable to download the rental agreement.');
+    }
   };
 
   return (
     <div className="relative">
       <button
         type="button"
-        onClick={handleOpen}
+        onClick={() => setIsOpen((previous) => !previous)}
         className="relative flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
         aria-label="Open notifications"
+        aria-expanded={isOpen}
       >
         <Badge count={serverUnread ?? unreadCount} showZero overflowCount={9}>
           <BellOutlined style={{ fontSize: 18 }} />
         </Badge>
       </button>
 
-      {location.pathname === '/notifications' && (
-        <NotificationDrawer
-          open={isOpen}
-          onClose={() => setIsOpen(false)}
-          notifications={notifications}
-          onMarkRead={handleMarkRead}
-          onMarkAllRead={handleMarkAllRead}
-          onDelete={handleDelete}
-        />
-      )}
+      <NotificationDrawer
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        notifications={notifications}
+        onMarkRead={handleMarkRead}
+        onMarkAllRead={handleMarkAllRead}
+        onDelete={handleDelete}
+        onDownloadAgreement={handleDownloadAgreement}
+      />
     </div>
   );
 }

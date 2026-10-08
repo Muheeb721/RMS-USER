@@ -11,13 +11,11 @@ const suggestedQuestions = [
   'Show available properties'
 ];
 
-const defaultResponses = {
-  property: 'I found premium options in DHA Lahore, Bahria Town, and Gulberg. You can view them from the listings page.',
-  hostel: 'I recommend Skyline Boys Hostel in Canal View and Horizon Girls Hostel in Valencia Town.',
-  location: 'Popular Lahore areas include DHA Lahore, Bahria Town, Johar Town, Gulberg, and Model Town.',
-  budget: 'I can filter listings by your budget range and bedroom count for the best matches.',
-  general: 'RMS can help you browse properties, compare hostels, track dues, and answer FAQs for Lahore rentals.'
-};
+// Backend chatbot API ka address
+const CHAT_API_URL = 'http://localhost:5000/api/chatbot/message';
+
+// Har browser session ke liye ek unique ID (taake conversation history yaad rahe)
+const SESSION_ID = 'rms-user-' + Math.random().toString(36).substring(2, 10);
 
 function ChatBot() {
   const [open, setOpen] = useState(false);
@@ -34,39 +32,44 @@ function ChatBot() {
     }
   }, [messages, isTyping]);
 
-  const handleQuickReply = (text) => {
+  // Asal backend ko call karne wala function
+  const sendToBackend = async (text) => {
     setMessages((prev) => [...prev, { id: Date.now(), from: 'user', text }]);
     setIsTyping(true);
-    setTimeout(() => {
-      let reply = defaultResponses.general;
-      if (text.includes('hostel')) reply = defaultResponses.hostel;
-      if (text.includes('property')) reply = defaultResponses.property;
-      if (text.includes('location')) reply = defaultResponses.location;
-      if (text.includes('budget')) reply = defaultResponses.budget;
-      setMessages((prev) => [...prev, { id: Date.now() + 1, from: 'bot', text: reply }]);
+
+    try {
+      const response = await fetch(CHAT_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: SESSION_ID, message: text }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Server error');
+      }
+
+      const data = await response.json();
+      setMessages((prev) => [...prev, { id: Date.now() + 1, from: 'bot', text: data.reply }]);
+    } catch (error) {
+      setMessages((prev) => [
+        ...prev,
+        { id: Date.now() + 1, from: 'bot', text: 'Maaf kijiye, abhi server se connect nahi ho pa raha. Dobara try karein.' },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 700);
+    }
+  };
+
+  const handleQuickReply = (text) => {
+    sendToBackend(text);
   };
 
   const handleSubmit = (event) => {
     event.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) return;
-    setMessages((prev) => [...prev, { id: Date.now(), from: 'user', text: trimmed }]);
     setInput('');
-    setIsTyping(true);
-    setTimeout(() => {
-      let reply = defaultResponses.general;
-      const lower = trimmed.toLowerCase();
-      if (lower.includes('hostel')) reply = defaultResponses.hostel;
-      if (lower.includes('property')) reply = defaultResponses.property;
-      if (lower.includes('location')) reply = defaultResponses.location;
-      if (lower.includes('budget')) reply = defaultResponses.budget;
-      if (lower.includes('dues')) reply = 'You can view dues and payment history from the Resident Dues page with overdue alerts.';
-      if (lower.includes('contact')) reply = `Reach out to ${propertyData[0].owner} at ${propertyData[0].contact} for assistance.`;
-      setMessages((prev) => [...prev, { id: Date.now() + 1, from: 'bot', text: reply }]);
-      setIsTyping(false);
-    }, 700);
+    sendToBackend(trimmed);
   };
 
   const summary = useMemo(() => `${propertyData.length} properties and ${hostelData.length} hostels available in Lahore right now.`, []);

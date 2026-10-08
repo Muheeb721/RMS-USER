@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Row,
   Col,
@@ -31,6 +31,8 @@ import { hostelData, popularAreas, stats, reviews } from "../data/dummyData";
 import apiClient from '../services/apiClient';
 import { useProperties } from "../contexts/PropertyContext";
 import { useAuth } from '../contexts/AuthContext';
+import authRedirect from '../utils/authRedirect';
+import { getPropertyId, getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
 import FavoriteToggle from '../components/FavoriteToggle';
 import "./HomePage.css";
 import "./home-redesign.css";
@@ -43,15 +45,14 @@ import HomeFooter from '../components/home/HomeFooter';
 import ActionModal from "../components/ActionModal";
 import { toast } from "react-toastify";
 import RentalBookingModal from '../components/RentalBookingModal';
+import { getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
 // dashboard submissions are handled on the dedicated Dashboard page
-import { FALLBACK_IMAGE } from '../utils/imageUtils';
-import { getPrimaryImage } from '../utils/imageUtils';
-import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 
 function HomePage() {
   const [selectedListing, setSelectedListing] = useState(null);
   const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [catalogImages, setCatalogImages] = useState({ HOME: [], HOUSE: [], FLAT: [], APARTMENT: [], PROPERTY: [], DEMO: [] });
+  const [carouselStarts, setCarouselStarts] = useState({});
+  const carouselSections = useRef([]);
   // removed inline dashboard UI/state from Home page
   const navigate = useNavigate();
   const { properties } = useProperties();
@@ -69,16 +70,6 @@ function HomePage() {
       try {
         const service = await import('../services/propertyService');
         await service.listProperties();
-
-        const response = await apiClient.get('/images');
-        if (mounted && response?.data?.success) {
-          const grouped = { HOME: [], HOUSE: [], FLAT: [], APARTMENT: [], PROPERTY: [], DEMO: [] };
-          for (const item of response.data.data || []) {
-            const key = String(item.category || 'OTHER').toUpperCase();
-            if (grouped[key]) grouped[key].push(item);
-          }
-          setCatalogImages(grouped);
-        }
       } catch (e) {
         console.warn('HomePage property load failed', e);
         if (mounted) setError('Unable to load properties');
@@ -97,7 +88,7 @@ function HomePage() {
   const [rentalBookingOpen, setRentalBookingOpen] = useState(false);
 
   const inferPropertyType = (property) => {
-    const candidates = [property?.type, property?.propertyType, property?.category, property?.title];
+    const candidates = [property?.propertyType, property?.category, property?.type, property?.title];
     for (const candidate of candidates) {
       const value = String(candidate || '').trim();
       if (!value) continue;
@@ -109,57 +100,13 @@ function HomePage() {
       if (lower.includes('house')) return 'House';
       if (lower.includes('apartment')) return 'Apartment';
       if (lower.includes('flat')) return 'Flat';
+      if (lower === 'property' || lower === 'properties') continue;
       return value;
     }
     return '';
   };
 
   const normalizePropertyType = (property) => inferPropertyType(property);
-
-  const HOME_VIP_HOUSES = catalogImages.HOUSE.length
-    ? catalogImages.HOUSE.map((item) => item.imageUrl).filter(Boolean)
-    : [
-        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600565193348-f74bd3c7ccdf?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1580587771525-78b9dba3b914?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600573472592-401b489a3cdc?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1523217582562-09d0def993a6?auto=format&fit=crop&w=1200&q=80',
-      ];
-
-  const HOME_FLATS_INTERIOR = catalogImages.FLAT.length
-    ? catalogImages.FLAT.map((item) => item.imageUrl).filter(Boolean)
-    : [
-        'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1502005229762-ee1b2b93e0f5?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=1200&q=80',
-      ];
-
-  const HOME_APARTMENTS_BUILDINGS = catalogImages.APARTMENT.length
-    ? catalogImages.APARTMENT.map((item) => item.imageUrl).filter(Boolean)
-    : [
-        'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1515263487990-61b07816b324?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1502005096674-719299666c97?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1508873696983-2df5293cb32f?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1512915922686-57c11dde9b6b?auto=format&fit=crop&w=1200&q=80',
-        'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=80',
-      ];
 
   const rawBaseProperties = Array.isArray(properties) && properties.length > 0 ? properties : [];
   const [areas, setAreas] = useState([]);
@@ -176,14 +123,7 @@ function HomePage() {
     })();
     return () => { mounted = false; };
   }, []);
-  const isDemoProperty = (p) => {
-    if (!p) return false;
-    const title = String(p.title || p.name || '').toLowerCase();
-    if (title.includes('demo') || title.includes('demo prop') || title.includes('prop-demo')) return true;
-    if (String(p.ownerId || '').toLowerCase() === 'demo-seed') return true;
-    return false;
-  };
-  const baseProperties = rawBaseProperties.filter(p => !isDemoProperty(p));
+  const baseProperties = rawBaseProperties;
   const normalizeCategoryLabel = (value = '') => {
     const normalized = String(value || '').trim();
     if (!normalized) return 'Properties';
@@ -198,51 +138,6 @@ function HomePage() {
   };
 
   const defaultSectionOrder = ['Houses', 'Apartments', 'Flats'];
-  const fallbackSectionCatalog = {
-    Houses: [
-      { id: 'fallback-house-1', title: '2 Storey Family Villa', type: 'House', category: 'House', propertyType: 'House', address: 'Bahria Town, Lahore', bedrooms: 4, bathrooms: 3, area: '2,500 sq ft', price: 'PKR 14,500,000', image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1200&q=80'] },
-      { id: 'fallback-house-2', title: 'Modern Corner House', type: 'House', category: 'House', propertyType: 'House', address: 'Gulberg, Lahore', bedrooms: 5, bathrooms: 4, area: '3,200 sq ft', price: 'PKR 18,900,000', image: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1200&q=80'] },
-      { id: 'fallback-house-3', title: 'Luxury Garden Villa', type: 'House', category: 'House', propertyType: 'House', address: 'Defence, Lahore', bedrooms: 6, bathrooms: 5, area: '4,100 sq ft', price: 'PKR 27,400,000', image: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1200&q=80'] },
-    ],
-    Apartments: [
-      { id: 'fallback-apartment-1', title: 'Skyline Residency', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'Johar Town, Lahore', bedrooms: 3, bathrooms: 2, area: '1,750 sq ft', price: 'PKR 9,800,000', image: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80'] },
-      { id: 'fallback-apartment-2', title: 'City View Heights', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'Model Town, Lahore', bedrooms: 2, bathrooms: 2, area: '1,250 sq ft', price: 'PKR 6,200,000', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80'] },
-      { id: 'fallback-apartment-3', title: 'Pearl Apartments', type: 'Apartment', category: 'Apartment', propertyType: 'Apartment', address: 'DHA Phase 6, Lahore', bedrooms: 4, bathrooms: 3, area: '2,300 sq ft', price: 'PKR 13,600,000', image: 'https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=1200&q=80'] },
-    ],
-    Flats: [
-      { id: 'fallback-flat-1', title: 'Comfort Flat Deluxe', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Wapda Town, Lahore', bedrooms: 2, bathrooms: 2, area: '1,050 sq ft', price: 'PKR 70,000 / month', image: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
-      { id: 'fallback-flat-2', title: 'Riverside Studio Flat', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Faisal Town, Lahore', bedrooms: 1, bathrooms: 1, area: '760 sq ft', price: 'PKR 52,000 / month', image: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
-      { id: 'fallback-flat-3', title: 'Executive Family Flat', type: 'Flat', category: 'Flat', propertyType: 'Flat', address: 'Cavalry Ground, Lahore', bedrooms: 3, bathrooms: 2, area: '1,450 sq ft', price: 'PKR 88,000 / month', image: 'https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80', images: ['https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=1200&q=80'], transactionType: 'Rent' },
-    ],
-  };
-
-  const buildFallbackSectionItems = (title) => {
-    const source = fallbackSectionCatalog[title] || [];
-    return source.map((item, index) => ({
-      ...item,
-      id: item.id || `${title.toLowerCase()}-${index + 1}`,
-      title: item.title || `${title} Listing`,
-      address: item.address || 'Lahore, Pakistan',
-      location: item.address || 'Lahore, Pakistan',
-      bedrooms: item.bedrooms || 2,
-      bathrooms: item.bathrooms || 2,
-      area: item.area || '1,200 sq ft',
-      price: item.price || 'Contact',
-      transactionType: item.transactionType || (title === 'Flats' ? 'Rent' : 'Sale'),
-      type: item.type || title.replace(/s$/, ''),
-      propertyType: item.propertyType || title.replace(/s$/, ''),
-      category: item.category || title.replace(/s$/, ''),
-      image: item.image || item.images?.[0] || FALLBACK_IMAGE,
-      images: item.images || [item.image || FALLBACK_IMAGE],
-    }));
-  };
-
-  const buildDefaultSections = () => defaultSectionOrder.map((title) => ({
-    title,
-    accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
-    items: buildFallbackSectionItems(title),
-  }));
-
   const getCategoryProperties = (categoryName) => {
     const normalizedCategory = String(categoryName || '').toLowerCase();
     const aliases = {
@@ -254,48 +149,12 @@ function HomePage() {
     const matches = baseProperties.filter((property) => {
       const typeValue = normalizePropertyType(property).toLowerCase();
       const allowedValues = aliases[normalizedCategory] || [normalizedCategory];
-      return allowedValues.includes(typeValue) || typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
+      return !isSaleProperty(property)
+        && (allowedValues.includes(typeValue) || typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`);
     });
 
-    return matches.slice(0, 3);
+    return matches;
   };
-
-  const getCustomCategoryGroups = () => {
-    const groups = new Map();
-    for (const property of baseProperties) {
-      const label = normalizeCategoryLabel(
-        inferPropertyType(property) || property?.category || property?.type || property?.propertyType || 'Properties'
-      );
-      if (!groups.has(label)) groups.set(label, []);
-      groups.get(label).push(property);
-    }
-
-    const defaultGroups = ['Houses', 'Apartments', 'Flats'];
-    const orderedGroups = [];
-
-    for (const key of defaultGroups) {
-      const inheritedItems = groups.get(key) || getCategoryProperties(key.toLowerCase().replace(/s$/, ''));
-      orderedGroups.push({
-        title: key,
-        items: Array.isArray(inheritedItems) ? inheritedItems.slice(0, 3) : [],
-        accent: key === 'Flats' ? '#14b8a6' : key === 'Apartments' ? '#0ea5e9' : '#d97706',
-      });
-    }
-
-    for (const [title, items] of groups.entries()) {
-      if (defaultGroups.includes(title)) continue;
-      if (!Array.isArray(items) || !items.length) continue;
-      orderedGroups.push({
-        title,
-        items: items.slice(0, 3),
-        accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
-      });
-    }
-
-    return orderedGroups.slice(0, 6);
-  };
-
-  const dynamicPropertySections = useMemo(() => getCustomCategoryGroups(), [baseProperties]);
 
   const houseProperties = getCategoryProperties('house');
   const apartmentProperties = getCategoryProperties('apartment');
@@ -305,6 +164,7 @@ function HomePage() {
     const orderedTitles = defaultSectionOrder;
 
     for (const property of baseProperties) {
+      if (isSaleProperty(property)) continue;
       const label = normalizeCategoryLabel(
         inferPropertyType(property) || property?.category || property?.type || property?.propertyType || 'Properties'
       );
@@ -315,9 +175,7 @@ function HomePage() {
 
     const ordered = orderedTitles.map((title) => {
       const fallbackItems = grouped.get(title) || getCategoryProperties(title.toLowerCase().replace(/s$/, ''));
-      const resolvedItems = Array.isArray(fallbackItems) && fallbackItems.length > 0
-        ? fallbackItems.slice(0, 3)
-        : buildFallbackSectionItems(title);
+      const resolvedItems = Array.isArray(fallbackItems) ? fallbackItems.slice(0, 5) : [];
       return {
         title,
         accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
@@ -330,11 +188,28 @@ function HomePage() {
       .map(([title, items]) => ({
         title,
         accent: title === 'Flats' ? '#14b8a6' : title === 'Apartments' ? '#0ea5e9' : '#d97706',
-        items: items.slice(0, 3),
+        items: items.slice(0, 5),
       }));
 
     return [...ordered, ...extras];
   }, [baseProperties]);
+
+  carouselSections.current = visiblePropertySections;
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCarouselStarts((current) => {
+        const next = { ...current };
+        for (const section of carouselSections.current) {
+          if (section.items.length > 1) {
+            next[section.title] = ((current[section.title] || 0) + 1) % section.items.length;
+          }
+        }
+        return next;
+      });
+    }, 4500);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   const featuredHouseProperties = [...houseProperties].sort((a, b) => {
     const lowA = String(a.title || '').toLowerCase();
@@ -351,52 +226,41 @@ function HomePage() {
   };
 
   const handleRentProperty = async (property) => {
-    const id = property?.id || property?._id || '';
-    const rentRoute = `/rental-application${id ? `?propertyId=${encodeURIComponent(id)}` : ''}`;
-
-    if (!isLoggedIn) {
-      try {
-        const m = await import('../utils/selectedPropertyStorage.jsx');
-        await m.saveSelectedProperty(property);
-      } catch (e) {
-        console.warn('Unable to persist selected property before redirect', e);
-      }
-
-      try {
-        const authRedirect = await import('../utils/authRedirect');
-        authRedirect.default?.savePendingAction?.({
-          action: 'RENT_NOW',
-          propertyId: id,
+    if (isSaleProperty(property)) {
+      const saleRoute = getSaleInterestRoute(property);
+      if (!isLoggedIn) {
+        authRedirect.savePendingAction({
+          action: 'SALE_INTEREST',
+          propertyId: getPropertyId(property),
           propertyType: property?.type || property?.propertyType || '',
           propertyTitle: property?.title || property?.name || '',
-          returnRoute: rentRoute,
+          returnRoute: saleRoute,
         });
-      } catch (e) {
-        console.warn('Unable to save pending action for rent redirect', e);
+        navigate(`/login?redirect=${encodeURIComponent(saleRoute)}`);
+        return;
       }
 
-      navigate(`/login?redirect=${encodeURIComponent(rentRoute)}`);
+      navigate(saleRoute);
       return;
     }
 
-    try {
-      const m = await import('../utils/selectedPropertyStorage.jsx');
-      await m.saveSelectedProperty(property);
-    } catch (e) {
-      console.warn('Unable to persist selected property, falling back to navigation', e);
-    }
-
-    navigate(rentRoute);
-  };
-
-  const getCardPriceText = (property, blockTitle = '') => {
-    const isRentBlock = blockTitle === 'Flats' || String(property?.transactionType || '').toLowerCase() === 'rent';
-    if (isRentBlock) return 'Rent';
-    return property?.price || property?.rentPrice || 'Contact';
+    if (getRentUnavailableStatus(property)) return;
+    await startRentNow(property, isLoggedIn, navigate);
   };
 
   const renderCategoryShowcase = (title, items, accentColor = '#0f172a', overlayText = '') => {
-    const safeItems = Array.isArray(items) && items.length > 0 ? items : buildFallbackSectionItems(title);
+    const safeItems = Array.isArray(items) ? items : [];
+    const carouselStart = safeItems.length ? (carouselStarts[title] || 0) % safeItems.length : 0;
+    const visibleItems = safeItems.length
+      ? [...safeItems.slice(carouselStart), ...safeItems.slice(0, carouselStart)]
+      : [];
+    const uniqueImages = new Set();
+    const moveCarousel = (direction) => {
+      setCarouselStarts((current) => ({
+        ...current,
+        [title]: safeItems.length ? (carouselStart + direction + safeItems.length) % safeItems.length : 0,
+      }));
+    };
 
     return (
     <section className="hr-section home-category-section" key={title}>
@@ -408,26 +272,37 @@ function HomePage() {
         <Link to="/properties" className="btn-ghost">View all</Link>
       </div>
 
-      <Row gutter={[18, 18]} className="home-category-grid" style={{ marginTop: 12 }}>
-        {safeItems.slice(0, 3).map((property, index) => (
-          <Col xs={24} sm={12} md={8} key={property.id || `${title}-${property.title}`}>
+      {safeItems.length ? (
+      <div className="home-carousel">
+        <div className="home-carousel-controls">
+          <Button
+            aria-label={`Previous ${title}`}
+            onClick={() => moveCarousel(-1)}
+          >‹</Button>
+          <span>{safeItems.length} properties</span>
+          <Button
+            aria-label={`Next ${title}`}
+            onClick={() => moveCarousel(1)}
+          >›</Button>
+        </div>
+        <div className="home-carousel-track" style={{ marginTop: 12 }}>
+        {visibleItems.map((property, index) => {
+          const rawImage = Array.isArray(property?.images) && property.images.length
+            ? property.images[0]
+            : property?.image || property?.featuredImage?.url || '';
+          const imageUrl = typeof rawImage === 'string' ? rawImage : rawImage?.url || '';
+          const imageIsUnique = imageUrl && !uniqueImages.has(imageUrl);
+          if (imageIsUnique) uniqueImages.add(imageUrl);
+          const propertyId = property.id || property._id;
+          const price = property.rent || property.rentPrice || property.price || 'Contact';
+          return (
+          <div className="home-carousel-item" key={propertyId || `${title}-${property.title}-${index}`}>
             <Card
               cover={
                 <div className="home-category-image-wrap">
-                  <img
-                    alt={property.title}
-                    src={
-                      Array.isArray(property?.images) && property.images.length
-                        ? property.images[0]
-                        : property?.image || resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE
-                    }
-                    loading="lazy"
-                    style={{ width: '100%', height: 260, objectFit: 'cover' }}
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src = FALLBACK_IMAGE;
-                    }}
-                  />
+                  {imageIsUnique ? (
+                    <img alt={property.title} src={imageUrl} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }} />
+                  ) : <div className="home-category-no-image">No image available</div>}
                   {overlayText ? (
                     <div className="home-category-overlay">{overlayText}</div>
                   ) : null}
@@ -437,8 +312,8 @@ function HomePage() {
             >
               <div className="card-body">
                 <div className="card-top-row">
-                  <Tag color={accentColor}>{title === 'Flats' ? 'FOR RENT' : 'FEATURED'}</Tag>
-                  <span className="card-price">{getCardPriceText(property, title)}</span>
+                  <Tag color={accentColor}>FOR RENT</Tag>
+                  <span className="card-price">{Number(price) > 0 ? `PKR ${Number(price).toLocaleString()} / month` : price}</span>
                 </div>
                 <div className="card-title">{property.title}</div>
                 <div className="card-address">{property.address || property.location}</div>
@@ -448,19 +323,25 @@ function HomePage() {
                   <span className="meta-pill">{property.area || 'Area'}</span>
                 </div>
                 <div className="card-actions">
-                  <Button onClick={() => handleContactProperty(property, title === 'Flats' ? 'rent' : 'sale')}>
-                    {title === 'Houses' ? 'House Sale' : title === 'Apartments' ? 'Apartment Enquiry' : 'Rent Inquiry'}
-                  </Button>
-                  <Button type="primary" onClick={() => handleRentProperty(property)}>
-                    {title === 'Flats' ? 'Rent' : 'Book Now'}
+                  <Button
+                    type="primary"
+                    disabled={Boolean(getRentUnavailableStatus(property))}
+                    onClick={() => handleRentProperty({ ...property, transactionType: 'Rent', listingType: 'rent' })}
+                  >
+                    {getRentUnavailableStatus(property) || 'Rent Now'}
                   </Button>
                   <FavoriteToggle item={property} label="Save" />
                 </div>
               </div>
             </Card>
-          </Col>
-        ))}
-      </Row>
+          </div>
+          );
+        })}
+        </div>
+      </div>
+      ) : (
+        <div className="home-category-empty">No {title.toLowerCase()} are available yet.</div>
+      )}
     </section>
     );
   };
@@ -511,7 +392,7 @@ function HomePage() {
           <Row gutter={[16,16]} style={{ marginTop: 8 }}>
             {baseProperties.filter(p => p.transactionType === 'Rent').slice(0,4).map((property, index) => (
               <Col xs={24} md={12} lg={6} key={property.id}>
-                <Card cover={<img alt={property.title} src={resolveUniquePropertyImage(property, 'home', index) || FALLBACK_IMAGE} style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />} className="property-card">
+                <Card cover={<img alt={property.title} src={property.image || ''} style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.style.display = 'none'; }} />} className="property-card">
                   <div className="card-body">
                     <div className="card-top-row">
                       <Tag color="cyan">FOR RENT</Tag>
@@ -527,7 +408,13 @@ function HomePage() {
                     <div className="card-actions">
                       <Button onClick={() => navigate(`/properties/${property.id}`)}>View Details</Button>
                       <FavoriteToggle item={property} label="Save" />
-                      <Button type="primary" onClick={() => handleRentProperty(property)}>Rent Now</Button>
+                      <Button
+                        type="primary"
+                        disabled={Boolean(getRentUnavailableStatus(property))}
+                        onClick={() => handleRentProperty(property)}
+                      >
+                        {getRentUnavailableStatus(property) || 'Rent Now'}
+                      </Button>
                     </div>
                   </div>
                 </Card>

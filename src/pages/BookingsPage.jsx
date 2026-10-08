@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Form, Input, Select, DatePicker, Tag, Table, Row, Col, Modal, Spin, Alert } from 'antd';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
-import { createBooking, read, update } from '../services/bookingService.jsx';
+import { createBooking, listAll, read, update } from '../services/bookingService.jsx';
 import { createPayment } from '../services/paymentsService.jsx';
 import { useProperties } from '../contexts/PropertyContext';
 import { createNotification } from '../services/notificationService.jsx';
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
+import { useAuth } from '../contexts/AuthContext';
 
 const statusColors = {
   Pending: 'gold',
@@ -19,6 +20,7 @@ const statusColors = {
 function BookingsPage() {
   const { properties } = useProperties();
   const user = useSelector((state) => state.auth?.user || {});
+  const { isAuthenticated, isAdmin } = useAuth();
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
   const [bookings, setBookings] = useState([]);
@@ -29,7 +31,7 @@ function BookingsPage() {
       setLoading(true);
       setError(null);
       try {
-        const nextBookings = await read();
+        const nextBookings = isAdmin ? await listAll() : await read();
         if (!mounted) return;
         setBookings(nextBookings);
       } catch (e) {
@@ -42,25 +44,36 @@ function BookingsPage() {
 
     loadBookings();
     return () => { mounted = false; };
-  }, []);
+  }, [isAdmin]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const visibleBookings = useMemo(() => {
-    if (!user?.email) return bookings;
+    if (isAdmin) return bookings;
+    if (!user?.email && !user?.id) return [];
     return bookings.filter((entry) => String(entry.userEmail || '').toLowerCase() === String(user.email || '').toLowerCase() || String(entry.userId || '').toLowerCase() === String(user.id || '').toLowerCase());
-  }, [bookings, user]);
+  }, [bookings, user, isAdmin]);
 
   const handleSubmit = async (values) => {
-    const property = properties.find((item) => String(item.id) === String(values.propertyId)) || properties[0];
+    if (!isAuthenticated || (!user?.id && !user?.email)) {
+      toast.error('Please log in before submitting a booking.');
+      return;
+    }
+
+    const property = properties.find((item) => String(item.id || item._id) === String(values.propertyId));
+    if (!property) {
+      toast.error('Select a valid property before submitting the booking.');
+      return;
+    }
+
     const booking = {
-      userId: user.id || 'guest-user',
+      userId: user.id || undefined,
       userName: user.name || values.name || 'RMS User',
       userEmail: user.email || values.email || 'guest@example.com',
-      propertyId: property?.id,
-      propertyTitle: property?.title || values.propertyTitle || 'Property',
-      propertyType: property?.type || values.propertyType || 'Property',
+      propertyId: property.id || property._id,
+      propertyTitle: property.title || values.propertyTitle || 'Property',
+      propertyType: property.type || property.propertyType || values.propertyType || 'Property',
       bookingDate: values.date ? values.date.toISOString() : new Date().toISOString(),
       bookingTime: values.time || '09:00 AM',
       amount: Number(values.amount || 0),
@@ -70,9 +83,11 @@ function BookingsPage() {
       notes: values.notes || '',
     };
 
+    let submitted = false;
     try {
       const res = await createBooking(booking);
       if (res && res.success) {
+        submitted = true;
         const created = res.data;
         const notification = createNotification({
           type: 'announcement',
@@ -105,7 +120,7 @@ function BookingsPage() {
           console.warn('Unable to create payment for booking', e);
         }
 
-        const refreshed = await read();
+        const refreshed = isAdmin ? await listAll() : await read();
         setBookings(refreshed);
         toast.success('Booking request saved.');
       } else {
@@ -115,14 +130,19 @@ function BookingsPage() {
       console.error('booking submit error', e);
       toast.error('Unable to create booking.');
     }
-    setOpen(false);
-    form.resetFields();
+    if (submitted) {
+      setOpen(false);
+      form.resetFields();
+    }
   };
 
   const handleDecision = async (id, status) => {
     try {
-      await update(id, { status });
-      const nextBookings = await read();
+      const result = await update(id, { status });
+      if (!result?.success) {
+        throw new Error(result?.message || 'Unable to update booking status.');
+      }
+      const nextBookings = isAdmin ? await listAll() : await read();
       setBookings(nextBookings);
       const booking = bookings.find((entry) => entry.id === id);
       if (booking) {
@@ -149,12 +169,12 @@ function BookingsPage() {
     { title: 'Amount', dataIndex: 'amount', key: 'amount', render: (value) => `Rs ${Number(value || 0).toLocaleString()}` },
     { title: 'Advance', dataIndex: 'advance', key: 'advance', render: (value) => `Rs ${Number(value || 0).toLocaleString()}` },
     { title: 'Status', dataIndex: 'status', key: 'status', render: (value) => <Tag color={statusColors[value] || 'default'}>{value}</Tag> },
-    { title: 'Action', key: 'action', render: (_, record) => (
+    ...(isAdmin ? [{ title: 'Action', key: 'action', render: (_, record) => (
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <Button size="small" onClick={() => handleDecision(record.id, 'Approved')}>Approve</Button>
-        <Button size="small" danger onClick={() => handleDecision(record.id, 'Rejected')}>Reject</Button>
+        <Button size="small" onClick={() => handleDecision(record.id || record._id, 'Approved')}>Approve</Button>
+        <Button size="small" danger onClick={() => handleDecision(record.id || record._id, 'Rejected')}>Reject</Button>
       </div>
-    ) },
+    ) }] : []),
   ];
 
   return (
@@ -192,7 +212,7 @@ function BookingsPage() {
           <Form.Item name="propertyId" label="Property" rules={[{ required: true }]}>
             <Select placeholder="Select property">
               {properties.map((property) => (
-                <Select.Option key={property.id} value={String(property.id)}>{property.title}</Select.Option>
+                <Select.Option key={property.id || property._id} value={String(property.id || property._id)}>{property.title}</Select.Option>
               ))}
             </Select>
           </Form.Item>

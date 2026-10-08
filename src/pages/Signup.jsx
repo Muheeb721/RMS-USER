@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { login, addNotification } from "../redux/store";
 import {
@@ -10,12 +10,16 @@ import {
 } from "../services/notificationService.jsx";
 import { addStoredNotification } from '../utils/notificationsStorage.jsx';
 import authService from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
+import authRedirect from '../utils/authRedirect';
 import { sanitizeFullName } from "../utils/nameValidation.jsx";
 import "./Signup.css";
 
 function Signup() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login: authLogin } = useAuth();
 
   const [form, setForm] = useState({
     name: "",
@@ -89,9 +93,24 @@ function Signup() {
 
       const data = res?.data ?? {};
       const inner = data?.result ?? data;
-      const token = inner?.token ?? data?.token ?? res?.token;
-      const userPayload = inner?.user ?? data?.user ?? res?.user ?? {};
+      let token = inner?.token ?? data?.token ?? res?.token;
+      let userPayload = inner?.user ?? data?.user ?? res?.user ?? {};
+      if (!token) {
+        const loginResponse = await authService.login(payload.email, payload.password);
+        const loginSuccess = Boolean(
+          loginResponse?.success ?? loginResponse?.data?.success ?? loginResponse?.data?.result?.success,
+        );
+        const loginData = loginResponse?.data ?? {};
+        const loginInner = loginData?.result ?? loginData;
+        token = loginInner?.token ?? loginData?.token ?? loginResponse?.token;
+        userPayload = loginInner?.user ?? loginData?.user ?? loginResponse?.user ?? userPayload;
+        if (!loginSuccess || !token) {
+          throw new Error(loginResponse?.message || loginData?.message || 'Account was created, but automatic login failed.');
+        }
+      }
+
       const user = saveSessionUser({
+        id: userPayload.id || userPayload._id || userPayload.userId || '',
         name: userPayload.name || form.name.trim(),
         email: userPayload.email || form.email.trim(),
         role: userPayload.role || (form.accountType === 'owner' ? 'owner' : 'resident'),
@@ -100,9 +119,13 @@ function Signup() {
         loginTime: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' }),
       });
 
-      if (typeof window !== 'undefined' && token) {
+      await authLogin({ user, token });
+      if (typeof window !== 'undefined') {
         window.__RMS_AUTH_TOKEN = token;
         window.__rms_inmemory_token = token;
+        window.localStorage.setItem('rms_token', token);
+        window.localStorage.setItem('rms_auth_session', JSON.stringify(user));
+        window.localStorage.setItem('rms_user_role', user.role || 'resident');
       }
 
       dispatch(login(user));
@@ -112,9 +135,15 @@ function Signup() {
       dispatch(addNotification(signupNote));
       try { addStoredNotification(loginNote); addStoredNotification(signupNote); } catch (e) {}
       toast.success(`Welcome to RMS, ${user.name}!`);
-      const nextRoute = form.accountType === 'owner' || user.role === 'admin' || user.role === 'owner' || user.role === 'manager'
-        ? '/admin'
-        : '/dashboard';
+      const params = new URLSearchParams(location.search);
+      const pendingAction = authRedirect.consumePendingAction();
+      const redirectParam = params.get('redirect');
+      const requestedRoute = redirectParam || pendingAction?.returnRoute || '';
+      const nextRoute = requestedRoute.startsWith('/') && !requestedRoute.startsWith('//')
+        ? requestedRoute
+        : form.accountType === 'owner' || user.role === 'admin' || user.role === 'owner' || user.role === 'manager'
+          ? '/admin'
+          : '/dashboard';
       navigate(nextRoute, { replace: true });
     } catch (err) {
       console.error(err);
@@ -287,18 +316,15 @@ function Signup() {
               {submitting ? "Creating..." : "Create Account"}
             </button>
 
-            <div className="divider">or continue with</div>
-            <button
-              type="button"
-              className="btn-google"
-              onClick={() => toast.info("Google Sign-in not connected in demo")}
-            >
-              Continue with Google
-            </button>
-
             <div className="alt">
               Already have an account?{" "}
-              <Link to="/login" className="link">
+              <Link
+                to={(() => {
+                  const redirect = new URLSearchParams(location.search).get('redirect');
+                  return redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login';
+                })()}
+                className="link"
+              >
                 Login
               </Link>
             </div>
