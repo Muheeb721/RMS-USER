@@ -20,7 +20,7 @@ import authRedirect from '../utils/authRedirect';
 import { getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
 const { Text } = Typography;
 import { toast } from 'react-toastify';
-import { getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
+import { getPropertyAvailabilityBadge, getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
 
 const statusColorMap = {
   Available: 'green',
@@ -172,6 +172,9 @@ function PropertyDetailsPage() {
     );
   }
 
+  const availabilityBadge = getPropertyAvailabilityBadge(property);
+  const showStatusRibbon = availabilityBadge.kind !== 'available';
+
   return (
     <div className="page-shell">
       <section className="section-card">
@@ -179,6 +182,26 @@ function PropertyDetailsPage() {
           <Col xs={24} lg={14}>
             <Card>
               <div style={{ position: 'relative' }}>
+                {showStatusRibbon && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 16,
+                    left: -12,
+                    transform: 'rotate(-35deg)',
+                    background: availabilityBadge.kind === 'sold' ? '#d92d20' : '#7a5af8',
+                    color: '#fff',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    letterSpacing: '0.08em',
+                    padding: '8px 24px',
+                    boxShadow: '0 10px 22px rgba(15, 23, 42, 0.24)',
+                    zIndex: 2,
+                    textTransform: 'uppercase',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {availabilityBadge.label}
+                  </div>
+                )}
                 <img
                   alt={property.title}
                   src={images[currentIndex]}

@@ -13,7 +13,6 @@ import favoriteService from './services/favoriteService';
 import { setFavorites } from './redux/store';
 import { PropertyProvider } from './contexts/PropertyContext';
 import { AuthProvider } from './contexts/AuthContext';
-import ChatWidget from './components/ChatWidget/ChatWidget';
 
 function App() {
   const AppInner = () => {
@@ -68,7 +67,6 @@ function App() {
               <AntApp>
                 <AppRoutes />
                 <ToastContainer position="top-right" />
-                <ChatWidget />
               </AntApp>
             </ConfigProvider>
           </BrowserRouter>

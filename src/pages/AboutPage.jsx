@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import './AboutPage.css';
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
 import { resolveCatalogPageImage } from '../utils/propertyImageCatalog';
@@ -10,19 +11,51 @@ const benefits = [
   { title: 'Better Resident Experience', icon: '✨' },
 ];
 
+const defaultSiteContent = {
+  aboutIntroTitle: 'Making Residential Management Simple & Smarter',
+  aboutIntroText: 'RMS is a smart and comprehensive Residential Management System designed to connect residents, property managers, landlords, and service providers on one integrated platform.',
+  aboutWhoTitle: 'Who We Are',
+  aboutWhoText: 'RMS is a digital platform designed to simplify and automate residential property management with modern tools for residents, owners, and operators.',
+  aboutMissionTitle: 'Our mission is to create smarter, safer, and better-managed residential communities.',
+  aboutMissionText: 'To provide smart, secure, and efficient tools that simplify property operations and improve the living experience for residents and managers.',
+  aboutVisionTitle: 'Our Vision',
+  aboutVisionText: 'To become a leading residential management platform that transforms how communities are managed, experienced, and connected.',
+  aboutCtaTitle: 'Ready to Manage Your Property Smarter?',
+  aboutCtaText: 'Join RMS and simplify your residential management experience.',
+};
+
 function AboutPage() {
+  const [siteContent, setSiteContent] = useState(defaultSiteContent);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep default about copy
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="about-page">
       <section className="hero-section" id="home">
         <div className="hero-copy1">
           <span className="section-tag">ABOUT US</span>
-          <h1>Making Residential Management Simple & Smarter</h1>
+          <h1>{siteContent.aboutIntroTitle || defaultSiteContent.aboutIntroTitle}</h1>
           <p>
-            RMS is a smart and comprehensive Residential Management System designed to connect residents, property managers, landlords, and service providers on one integrated platform.
+            {siteContent.aboutIntroText || defaultSiteContent.aboutIntroText}
           </p>
           <div className="hero-actions">
             <Link to="/contact" className="primary-btn">Get Started →</Link>
-            <a href="#contact" className="secondary-btn">Contact Us</a>
+            <Link to="/contact" className="secondary-btn">Contact Us</Link>
           </div>
         </div>
         <div className="hero-visual">
@@ -36,9 +69,9 @@ function AboutPage() {
         </div>
         <div className="who-we-are-copy">
           <span className="section-tag green">WHO WE ARE</span>
-          <h2>Who We Are</h2>
+          <h2>{siteContent.aboutWhoTitle || defaultSiteContent.aboutWhoTitle}</h2>
           <p>
-            RMS is a digital platform designed to simplify and automate residential property management with modern tools for residents, owners, and operators.
+            {siteContent.aboutWhoText || defaultSiteContent.aboutWhoText}
           </p>
           <div className="feature-list">
             <div className="feature-pill">Smart Solutions</div>
@@ -54,23 +87,23 @@ function AboutPage() {
         
         <div className="mission-copy">
           <span className="section-tag">OUR MISSION</span>
-          <h2>Our mission is to create smarter, safer, and better-managed residential communities.</h2>
+          <h2>{siteContent.aboutMissionTitle || defaultSiteContent.aboutMissionTitle}</h2>
         </div>
       </section>
 
       <section className="vision-mission-section">
         <div className="vision-card">
           <span className="section-tag green">OUR VISION</span>
-          <h3>Our Vision</h3>
+          <h3>{siteContent.aboutVisionTitle || defaultSiteContent.aboutVisionTitle}</h3>
           <p>
-            To become a leading residential management platform that transforms how communities are managed, experienced, and connected.
+            {siteContent.aboutVisionText || defaultSiteContent.aboutVisionText}
           </p>
         </div>
         <div className="vision-card">
           <span className="section-tag">OUR MISSION</span>
           <h3>Our Mission</h3>
           <p>
-            To provide smart, secure, and efficient tools that simplify property operations and improve the living experience for residents and managers.
+            {siteContent.aboutMissionText || defaultSiteContent.aboutMissionText}
           </p>
         </div>
       </section>
@@ -113,8 +146,8 @@ function AboutPage() {
           <img src={resolveCatalogPageImage('About Page', 'CTA', 0, 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1400&q=80')} alt="Premium property" style={{ width: '100%', objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror = null; e.currentTarget.src = FALLBACK_IMAGE; }} />
         </div>
         <div className="cta-copy">
-          <h2>Ready to Manage Your Property Smarter?</h2>
-          <p>Join RMS and simplify your residential management experience.</p>
+          <h2>{siteContent.aboutCtaTitle || defaultSiteContent.aboutCtaTitle}</h2>
+          <p>{siteContent.aboutCtaText || defaultSiteContent.aboutCtaText}</p>
           <Link to="/contact" className="primary-btn">Get Started →</Link>
         </div>
       </section>

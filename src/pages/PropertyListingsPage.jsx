@@ -20,7 +20,7 @@ import { resolveUniquePropertyImage } from '../utils/propertyImageCatalog';
 import authRedirect from '../utils/authRedirect';
 import { getSaleInterestRoute, isSaleProperty } from '../utils/saleInterest';
 import { useAuth } from '../contexts/AuthContext';
-import { getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
+import { getPropertyAvailabilityBadge, getRentUnavailableStatus, startRentNow } from '../utils/rentFlow';
 
 const { Paragraph } = Typography;
 
@@ -327,12 +327,34 @@ function PropertyListingsPage() {
             <Row gutter={[16, 16]}>
               {filteredProperties.map((property, index) => {
                 const cardImage = getPrimaryImage(property, index, 'properties') || FALLBACK_IMAGE;
+                const availabilityBadge = getPropertyAvailabilityBadge(property);
+                const showStatusRibbon = availabilityBadge.kind !== 'available';
                 return (
                 <Col xs={24} md={12} lg={8} key={property.id}>
                   <Card
                     className="property-card"
                     cover={
-                      <div className="property-cover">
+                      <div className="property-cover" style={{ position: 'relative' }}>
+                        {showStatusRibbon && (
+                          <div style={{
+                            position: 'absolute',
+                            top: 14,
+                            left: -10,
+                            transform: 'rotate(-35deg)',
+                            background: availabilityBadge.kind === 'sold' ? '#d92d20' : '#7a5af8',
+                            color: '#fff',
+                            fontWeight: 800,
+                            fontSize: 11,
+                            letterSpacing: '0.08em',
+                            padding: '6px 18px',
+                            boxShadow: '0 8px 18px rgba(15, 23, 42, 0.2)',
+                            zIndex: 2,
+                            textTransform: 'uppercase',
+                            whiteSpace: 'nowrap',
+                          }}>
+                            {availabilityBadge.label}
+                          </div>
+                        )}
                         <img alt={property.title} src={cardImage} loading="lazy" style={{ width: '100%', height: 260, objectFit: 'cover' }} onError={(e)=>{ e.currentTarget.onerror=null; e.currentTarget.src=FALLBACK_IMAGE; }} />
                         <div className="cover-actions">
                           <Button type="primary" icon={<EyeOutlined />} onClick={() => {

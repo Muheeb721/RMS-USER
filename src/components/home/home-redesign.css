@@ -278,6 +278,41 @@
   gap: 12px;
 }
 
+.why-metric-card {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 12px 8px;
+}
+
+.why-metric-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 54px;
+  font-variant-numeric: tabular-nums;
+}
+
+.why-metric-number {
+  display: inline-block;
+  min-width: 110px;
+  color: var(--hr-primary);
+  font-size: clamp(1.6rem, 2vw, 2.2rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.why-metric-label {
+  color: var(--hr-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
 .why-icon {
   font-size: 28px;
   color: var(--hr-accent);

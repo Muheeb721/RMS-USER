@@ -183,6 +183,7 @@ function ProfilePage() {
   }, [favorites, properties]);
 
   const unreadCount = notifications.filter((item) => item.unread).length;
+  const recentActivity = Array.isArray(profile.loginHistory) ? [...profile.loginHistory].reverse().slice(0, 4) : [];
   const activeProperties = properties.length;
   const profileCompletion = Math.min(
     100,
@@ -475,6 +476,34 @@ function ProfilePage() {
                 ))}
               </div>
             )}
+          </section>
+
+          <section className="profile-section">
+            <div className="section-heading">
+              <h3>Recent activity</h3>
+              <p>Your recent sign-ins, account activity, and secure access history.</p>
+            </div>
+            <Card className="profile-panel">
+              <div className="profile-list">
+                {recentActivity.length === 0 ? (
+                  <p>No recent activity recorded yet.</p>
+                ) : recentActivity.map((item, index) => (
+                  <div key={`${item.timestamp || index}`} className="profile-list-item">
+                    <div className="item-row">
+                      <div>
+                        <strong>{item.browser || 'Secure login'}</strong>
+                        <span>
+                          {new Date(item.timestamp || Date.now()).toLocaleString('en-PK', {
+                            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                          })} • {item.device || 'Desktop'} • {item.ip || 'Unknown IP'}
+                        </span>
+                      </div>
+                      <Tag color="green">Success</Tag>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </section>
 
           <section className="profile-section">

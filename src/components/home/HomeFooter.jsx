@@ -1,12 +1,36 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import './home-redesign.css';
 
+const defaultSiteContent = {
+  brandName: 'RMS',
+  footerDescription: 'Premium residential management for properties, residents, payments, and maintenance.',
+};
+
 export default function HomeFooter(){
+  const [siteContent, setSiteContent] = useState(defaultSiteContent);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep default footer values
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <footer className="hr-footer">
       <div className="hr-footer-inner">
-        <div className="hr-brand">RMS</div>
+        <div className="hr-brand">{siteContent.brandName || defaultSiteContent.brandName}</div>
         <div className="hr-links">
           <div>
             <h5>Quick Links</h5>

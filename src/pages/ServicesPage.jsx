@@ -9,6 +9,7 @@ import {
   BarChartOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
+import { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import "./ServicesPage.css";
 import { FALLBACK_IMAGE } from '../utils/imageUtils';
@@ -99,8 +100,34 @@ const metrics = [
     icon: <FileTextOutlined />,
   },
 ];
+const defaultSiteContent = {
+  servicesIntroLabel: 'Built for residential operations',
+  servicesTitle: 'Residential Management Services',
+  servicesSubtitle: 'Deliver modern property management for houses, apartments, and hostels with a polished platform that combines rent tracking, maintenance, resident records, and reporting.',
+  servicesCtaTitle: 'Bring operations, payments and resident services together in one platform.',
+  servicesCtaText: 'Ready to modernize residential management?',
+};
+
 function ServicesPage() {
   const navigate = useNavigate();
+  const [siteContent, setSiteContent] = useState(defaultSiteContent);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep default services copy
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="services-page">
@@ -108,13 +135,11 @@ function ServicesPage() {
         <div className="services-hero-backdrop" />
         <div className="services-hero-body">
           <span className="services-hero-label">
-            Built for residential operations
+            {siteContent.servicesIntroLabel || defaultSiteContent.servicesIntroLabel}
           </span>
-          <h1>Residential Management Services</h1>
+          <h1>{siteContent.servicesTitle || defaultSiteContent.servicesTitle}</h1>
           <p>
-            Deliver modern property management for houses, apartments, and
-            hostels with a polished platform that combines rent tracking,
-            maintenance, resident records, and reporting.
+            {siteContent.servicesSubtitle || defaultSiteContent.servicesSubtitle}
           </p>
           <div className="services-hero-actions">
             <Button type="primary" size="large">
@@ -190,10 +215,9 @@ function ServicesPage() {
 
       <section id="cta" className="services-cta-banner">
         <div>
-          <p>Ready to modernize residential management?</p>
+          <p>{siteContent.servicesCtaText || defaultSiteContent.servicesCtaText}</p>
           <h2>
-            Bring operations, payments and resident services together in one
-            platform.
+            {siteContent.servicesCtaTitle || defaultSiteContent.servicesCtaTitle}
           </h2>
         </div>
         <Button type="primary" size="large" onClick={() => navigate("/demo")}>

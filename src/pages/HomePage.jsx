@@ -41,7 +41,6 @@ import PropertySearch from '../components/home/PropertySearch';
 import WhyChooseRMS from '../components/home/WhyChooseRMS';
 import HowItWorks from '../components/home/HowItWorks';
 // HomeCTA removed from HomePage to match requested layout
-import HomeFooter from '../components/home/HomeFooter';
 import ActionModal from "../components/ActionModal";
 import { toast } from "react-toastify";
 import RentalBookingModal from '../components/RentalBookingModal';
@@ -149,8 +148,20 @@ function HomePage() {
     const matches = baseProperties.filter((property) => {
       const typeValue = normalizePropertyType(property).toLowerCase();
       const allowedValues = aliases[normalizedCategory] || [normalizedCategory];
-      return !isSaleProperty(property)
-        && (allowedValues.includes(typeValue) || typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`);
+      const isTypeMatch = allowedValues.includes(typeValue) || typeValue === normalizedCategory || typeValue === `${normalizedCategory}s`;
+      if (!isTypeMatch) return false;
+
+      const transactionValue = String(property?.transactionType || property?.listingType || property?.listing_type || '').trim().toLowerCase();
+      const titleValue = String(property?.title || property?.name || '').trim().toLowerCase();
+      const explicitSale = isSaleProperty(property)
+        || ['sale', 'sell', 'buy', 'purchase', 'for sale'].includes(transactionValue)
+        || titleValue.includes('for sale')
+        || titleValue.includes('sale');
+      const explicitRent = ['rent', 'rental', 'for rent'].includes(transactionValue)
+        || titleValue.includes('for rent')
+        || titleValue.includes('rent');
+
+      return explicitSale || (!explicitRent && !transactionValue);
     });
 
     return matches;
@@ -164,7 +175,6 @@ function HomePage() {
     const orderedTitles = defaultSectionOrder;
 
     for (const property of baseProperties) {
-      if (isSaleProperty(property)) continue;
       const label = normalizeCategoryLabel(
         inferPropertyType(property) || property?.category || property?.type || property?.propertyType || 'Properties'
       );
@@ -225,22 +235,27 @@ function HomePage() {
     navigate(`/contact?propertyTitle=${title}&propertyType=${type}&inquiryType=${inquiryType}`);
   };
 
+  const handleSaleProperty = (property) => {
+    const saleRoute = `/contact?propertyId=${encodeURIComponent(getPropertyId(property))}&propertyTitle=${encodeURIComponent(property?.title || '')}&propertyType=${encodeURIComponent(normalizePropertyType(property) || property?.type || property?.propertyType || '')}&inquiryType=${encodeURIComponent('Sale Inquiry')}`;
+
+    if (!isLoggedIn) {
+      authRedirect.savePendingAction({
+        action: 'SALE_INTEREST',
+        propertyId: getPropertyId(property),
+        propertyType: property?.type || property?.propertyType || '',
+        propertyTitle: property?.title || property?.name || '',
+        returnRoute: saleRoute,
+      });
+      navigate(`/login?redirect=${encodeURIComponent(saleRoute)}`);
+      return;
+    }
+
+    navigate(saleRoute);
+  };
+
   const handleRentProperty = async (property) => {
     if (isSaleProperty(property)) {
-      const saleRoute = getSaleInterestRoute(property);
-      if (!isLoggedIn) {
-        authRedirect.savePendingAction({
-          action: 'SALE_INTEREST',
-          propertyId: getPropertyId(property),
-          propertyType: property?.type || property?.propertyType || '',
-          propertyTitle: property?.title || property?.name || '',
-          returnRoute: saleRoute,
-        });
-        navigate(`/login?redirect=${encodeURIComponent(saleRoute)}`);
-        return;
-      }
-
-      navigate(saleRoute);
+      handleSaleProperty(property);
       return;
     }
 
@@ -294,7 +309,8 @@ function HomePage() {
           const imageIsUnique = imageUrl && !uniqueImages.has(imageUrl);
           if (imageIsUnique) uniqueImages.add(imageUrl);
           const propertyId = property.id || property._id;
-          const price = property.rent || property.rentPrice || property.price || 'Contact';
+          const isSale = isSaleProperty(property);
+          const price = property.price || property.rent || property.rentPrice || 'Contact';
           return (
           <div className="home-carousel-item" key={propertyId || `${title}-${property.title}-${index}`}>
             <Card
@@ -312,8 +328,8 @@ function HomePage() {
             >
               <div className="card-body">
                 <div className="card-top-row">
-                  <Tag color={accentColor}>FOR RENT</Tag>
-                  <span className="card-price">{Number(price) > 0 ? `PKR ${Number(price).toLocaleString()} / month` : price}</span>
+                  <Tag color={isSale ? 'orange' : 'cyan'}>{isSale ? 'FOR SALE' : 'FOR RENT'}</Tag>
+                  <span className="card-price">{Number(price) > 0 ? `PKR ${Number(price).toLocaleString()}` : price}</span>
                 </div>
                 <div className="card-title">{property.title}</div>
                 <div className="card-address">{property.address || property.location}</div>
@@ -326,9 +342,9 @@ function HomePage() {
                   <Button
                     type="primary"
                     disabled={Boolean(getRentUnavailableStatus(property))}
-                    onClick={() => handleRentProperty({ ...property, transactionType: 'Rent', listingType: 'rent' })}
+                    onClick={() => (isSale ? handleSaleProperty(property) : handleRentProperty({ ...property, transactionType: 'Rent', listingType: 'rent' }))}
                   >
-                    {getRentUnavailableStatus(property) || 'Rent Now'}
+                    {getRentUnavailableStatus(property) || (isSale ? 'Book Now' : 'Rent Now')}
                   </Button>
                   <FavoriteToggle item={property} label="Save" />
                 </div>
@@ -377,7 +393,6 @@ function HomePage() {
 
       <WhyChooseRMS />
       <HowItWorks />
-      <HomeFooter />
 
       {baseProperties.filter(p => p.transactionType === 'Rent').length > 0 && (
         <section className="section-card section-spacing">

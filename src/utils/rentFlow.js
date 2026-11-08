@@ -4,12 +4,40 @@ import { saveSelectedProperty } from './selectedPropertyStorage.jsx';
 
 const isValidPropertyId = (id) => /^[0-9a-fA-F]{24}$/.test(String(id || ''));
 
+export const normalizePropertyAvailability = (value) => {
+  const status = String(value || '').trim();
+  if (!status) return 'Available';
+
+  const lowered = status.toLowerCase();
+  if (['available', 'available now', 'ready', 'soon available', 'for rent'].includes(lowered)) return 'Available';
+  if (['booked', 'reserved', 'occupied', 'pending', 'approved', 'confirmed'].includes(lowered)) return 'Booked';
+  if (['rented', 'leased', 'tenant occupied'].includes(lowered)) return 'Rented';
+  if (['sold', 'sold out', 'closed'].includes(lowered)) return 'Sold';
+  if (['unavailable', 'not available'].includes(lowered)) return 'Unavailable';
+  return status;
+};
+
+export const getPropertyAvailabilityBadge = (property) => {
+  const status = normalizePropertyAvailability(property?.status || property?.availability || 'Available');
+
+  if (status === 'Available') return { label: 'Available', kind: 'available' };
+  if (['Booked', 'Rented', 'Unavailable'].includes(status)) return { label: 'Not Available', kind: 'unavailable' };
+  if (status === 'Sold') return { label: 'Sold Out', kind: 'sold' };
+  if (status === 'For Rent') return { label: 'Available', kind: 'available' };
+  return { label: status || 'Available', kind: status === 'Sold' ? 'sold' : 'available' };
+};
+
+export const isPropertyUnavailable = (property) => {
+  const status = normalizePropertyAvailability(property?.status || property?.availability || 'Available');
+  return ['Booked', 'Rented', 'Unavailable'].includes(status);
+};
+
+export const isPropertySoldOut = (property) => normalizePropertyAvailability(property?.status || property?.availability || 'Available') === 'Sold';
+
 export const getRentUnavailableStatus = (property) => {
-  const status = String(property?.status || property?.availability || '').trim().toLowerCase();
-  if (['booked', 'reserved', 'occupied'].includes(status)) return 'Booked';
-  if (['rented', 'leased', 'tenant occupied'].includes(status)) return 'Rented';
-  if (['sold', 'closed'].includes(status)) return 'Sold';
-  if (['unavailable', 'not available'].includes(status)) return 'Unavailable';
+  const badge = getPropertyAvailabilityBadge(property);
+  if (badge.kind === 'unavailable') return badge.label;
+  if (badge.kind === 'sold') return badge.label;
   return '';
 };
 

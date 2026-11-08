@@ -126,6 +126,21 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
 
   const rawStatus = item.status || item.availability || item.availabilityStatus || 'Available';
   const normalizedStatus = normalizePropertyState(rawStatus);
+  const transactionValue = String(
+    item.transactionType || item.listingType || item.listing_type || item.purpose || '',
+  ).trim().toLowerCase();
+  const titleValue = String(item.title || item.name || '').trim().toLowerCase();
+  const typeValue = String(item.type || item.propertyType || item.category || 'Property').trim().toLowerCase();
+  const inferredTransaction =
+    ['sale', 'sell', 'buy', 'purchase', 'for sale'].includes(transactionValue) || titleValue.includes('for sale') || titleValue.includes('sale')
+      ? 'Sale'
+      : ['rent', 'rental', 'for rent'].includes(transactionValue) || titleValue.includes('for rent') || titleValue.includes('rent')
+        ? 'Rent'
+        : ['house', 'apartment', 'villa', 'home'].includes(typeValue)
+          ? 'Sale'
+          : ['flat', 'room', 'studio'].includes(typeValue)
+            ? 'Rent'
+            : 'Sale';
 
   return {
     id: item._id || item.id || fallbackId,
@@ -138,12 +153,7 @@ const normalizeProperty = (item = {}, fallbackId = Date.now(), usedImages = new 
     salePrice: item.salePrice || "",
     type: item.type || "Property",
     listingType: item.listingType || item.listing_type || item.transactionType || item.purpose || "",
-    transactionType: (
-      item.transactionType ||
-      item.listingType ||
-      (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : undefined)) ||
-      (['House', 'Apartment'].includes(item.type) ? 'Sale' : (['Flat', 'Room'].includes(item.type) ? 'Rent' : 'Sale'))
-    ),
+    transactionType: item.transactionType || item.listingType || item.listing_type || item.purpose || inferredTransaction,
     location: item.location || item.address || "Lahore",
     address: item.address || item.location || "Lahore",
     area: item.area || "Lahore",

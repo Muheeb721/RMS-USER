@@ -1,22 +1,49 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightOutlined, SearchOutlined } from '@ant-design/icons';
+import { SearchOutlined } from '@ant-design/icons';
 import './home-redesign.css';
 
+const defaultSiteContent = {
+  heroChip: 'SMART PROPERTY + RENTAL MANAGEMENT',
+  heroTitle: 'Find Your Perfect Home',
+  heroSubtitle: 'RMS helps you buy, rent, manage rentals, track payments, and stay on top of maintenance in DHA and Askari communities.',
+  heroPrimaryCta: 'Explore Properties',
+  heroSecondaryCta: 'Find a Rental',
+};
+
 export default function HeroSection() {
+  const [siteContent, setSiteContent] = useState(defaultSiteContent);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep default hero copy
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <section className="hr-hero">
       <div className="hr-hero-inner">
         <div className="hr-hero-copy">
-          <span className="hr-chip">SMART PROPERTY + RENTAL MANAGEMENT</span>
-          <h1 className="hr-title">Find Your Perfect Home</h1>
+          <span className="hr-chip">{siteContent.heroChip || defaultSiteContent.heroChip}</span>
+          <h1 className="hr-title">{siteContent.heroTitle || defaultSiteContent.heroTitle}</h1>
           <p className="hr-sub">
-            RMS helps you buy, rent, manage rentals, track payments, and stay on top of maintenance in DHA and Askari communities.
+            {siteContent.heroSubtitle || defaultSiteContent.heroSubtitle}
           </p>
 
           <div className="hr-cta">
-            <Link to="/properties" className="btn-primary"><SearchOutlined /> Explore Properties</Link>
-            <Link to="/properties?transaction=Rent" className="btn-secondary">Find a Rental</Link>
+            <Link to="/properties" className="btn-primary"><SearchOutlined /> {siteContent.heroPrimaryCta || defaultSiteContent.heroPrimaryCta}</Link>
+            <Link to="/properties?transaction=Rent" className="btn-secondary">{siteContent.heroSecondaryCta || defaultSiteContent.heroSecondaryCta}</Link>
           </div>
 
           <div className="hr-feature-badges">

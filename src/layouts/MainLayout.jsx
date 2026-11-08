@@ -1,6 +1,7 @@
 import { Layout } from "antd";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import HeaderNav from "../components/Header";
 import "../styles/global.css";
 
@@ -8,7 +9,28 @@ const { Content, Footer } = Layout;
 
 function MainLayout() {
   const location = useLocation();
+  const [siteContent, setSiteContent] = useState({
+    brandName: 'RMS',
+    footerDescription: 'Premium residential management for properties, residents, payments, and maintenance.',
+  });
   const showHeader = location.pathname !== "/signup" && location.pathname !== "/signup/";
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep defaults
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#f6f8fc" }}>
@@ -45,11 +67,10 @@ function MainLayout() {
         >
           <div>
             <div style={{ fontWeight: 800, fontSize: 20, color: "#fff" }}>
-              RMS
+              {siteContent.brandName || 'RMS'}
             </div>
             <p style={{ margin: "8px 0 0", color: "#cbd5e1", lineHeight: 1.7 }}>
-              Premium residential management for properties, residents,
-              payments, and maintenance.
+              {siteContent.footerDescription || 'Premium residential management for properties, residents, payments, and maintenance.'}
             </p>
           </div>
           <div>
@@ -80,7 +101,7 @@ function MainLayout() {
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               <Link to="/faq">FAQ</Link>
-              <a href="mailto:muheebshahid75@gmail.com">Help Center</a>
+              <a href={siteContent.emailHref || 'mailto:muheebshahid75@gmail.com'}>{siteContent.contactEmail || 'Help Center'}</a>
               <Link to="/contact">Contact Support</Link>
             </div>
           </div>

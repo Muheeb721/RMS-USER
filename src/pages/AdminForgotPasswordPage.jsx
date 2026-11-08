@@ -6,7 +6,7 @@ import api from '../services/api';
 function AdminForgotPasswordPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState('email');
-  const [email, setEmail] = useState('admin@rental.com');
+  const [email, setEmail] = useState('admin@rms.com');
   const [resetToken, setResetToken] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');

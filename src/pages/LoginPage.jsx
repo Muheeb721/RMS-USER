@@ -156,14 +156,7 @@ function LoginPage() {
       const message = result?.message ?? result?.data?.message ?? 'Login failed';
 
       if (!result || !success) {
-        const finalMessage = String(message || '').toLowerCase();
-        if (finalMessage.includes('email') || finalMessage.includes('valid email')) {
-          toast.error('Email is incorrect. Please check your email address.');
-        } else if (finalMessage.includes('password')) {
-          toast.error('Password is incorrect. Please try again.');
-        } else {
-          toast.error(message || 'Login failed. Please try again.');
-        }
+        toast.error('Invalid email or password');
         setLoading(false);
         return;
       }
@@ -216,7 +209,7 @@ function LoginPage() {
       dispatch(login(sessionUser));
       dispatch(addNotification(createLoginNotification(sessionUser)));
       form.resetFields();
-      toast.success(`Welcome back, ${sessionUser.name}!`);
+      toast.success(`Welcome back, ${sessionUser.name}! You have logged in successfully.`);
       const pendingAction = authRedirect.consumePendingAction();
       const pendingRoute = getSafeRedirect(pendingAction?.returnRoute || '', '');
       const resolvedRedirect = redirectPath && redirectPath !== '/login' && redirectPath !== '/signup' && redirectPath !== '/register'

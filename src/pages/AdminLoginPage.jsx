@@ -69,7 +69,7 @@ function AdminLoginPage() {
 
         <Form layout="vertical" onFinish={handleSubmit}>
           <Form.Item label="Email" name="email" rules={[{ required: true, message: 'Email is required' }, { type: 'email', message: 'Enter a valid email' }]}>
-            <Input size="large" placeholder="admin@rental.com" />
+            <Input size="large" placeholder="admin@rms.com" />
           </Form.Item>
 
           <Form.Item label="Password" name="password" rules={[{ required: true, message: 'Password is required' }]}>

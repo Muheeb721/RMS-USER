@@ -10,7 +10,7 @@ import {
   LogoutOutlined,
 } from "@ant-design/icons";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/store";
 import { useAuth } from "../contexts/AuthContext";
@@ -25,7 +25,29 @@ function HeaderNav() {
   const authContext = useAuth();
   const { theme, user } = useSelector((state) => state.auth);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [siteContent, setSiteContent] = useState({
+    brandName: 'RMS',
+    brandTagline: 'Residential Management System',
+  });
   const isLoggedIn = Boolean(user?.isLoggedIn || user?.email);
+
+  useEffect(() => {
+    let active = true;
+
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setSiteContent((prev) => ({ ...prev, ...result.data }));
+      })
+      .catch(() => {
+        // keep defaults
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     try {
@@ -66,8 +88,8 @@ function HeaderNav() {
         <Link to="/" className="brand-link" style={{ color: theme === "dark" ? "#fff" : "#0b2450" }}>
           <div className="brand-mark">🏠</div>
           <div className="brand-copy">
-            <div className="brand-name">RMS</div>
-            <div className="brand-tagline">Residential Management System</div>
+            <div className="brand-name">{siteContent.brandName || 'RMS'}</div>
+            <div className="brand-tagline">{siteContent.brandTagline || 'Residential Management System'}</div>
           </div>
         </Link>
 

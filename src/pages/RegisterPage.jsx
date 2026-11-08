@@ -86,7 +86,7 @@ function RegisterPage() {
       dispatch(addNotification(createLoginNotification(user)));
       dispatch(addNotification(createSignupNotification(user)));
       form.resetFields();
-      toast.success(`Welcome to RMS, ${user.name}!`);
+      toast.success('You have successfully registered on RMS. Welcome!');
 
       const params = new URLSearchParams(location.search);
       const redirectParam = params.get('redirect');

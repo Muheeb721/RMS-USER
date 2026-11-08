@@ -47,7 +47,7 @@ const propertyOptions = {
   ],
 };
 
-const contactDetails = {
+const defaultContactDetails = {
   phone: "+92 304 0044410",
   phoneHref: "tel:+923040044410",
   email: "muheebshahid75@gmail.com",
@@ -61,24 +61,24 @@ const infoCards = [
   {
     icon: "📞",
     title: "Call Us",
-    text: contactDetails.phone,
-    href: contactDetails.phoneHref,
+    text: defaultContactDetails.phone,
+    href: defaultContactDetails.phoneHref,
     actionLabel: "Call now",
     isActionable: true,
   },
   {
     icon: "✉️",
     title: "Email Us",
-    text: contactDetails.email,
-    href: contactDetails.emailHref,
+    text: defaultContactDetails.email,
+    href: defaultContactDetails.emailHref,
     actionLabel: "Email now",
     isActionable: true,
   },
   {
     icon: "📍",
     title: "Visit Our Office",
-    text: contactDetails.locationLabel,
-    href: contactDetails.mapsHref,
+    text: defaultContactDetails.locationLabel,
+    href: defaultContactDetails.mapsHref,
     actionLabel: "Open map",
     isActionable: true,
   },
@@ -95,6 +95,32 @@ function ContactPage() {
   const [formData, setFormData] = useState(initialFormState);
   const location = useLocation();
   const [selectedProperty, setSelectedProperty] = useState(null);
+  const [contactDetails, setContactDetails] = useState(defaultContactDetails);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/site-content')
+      .then((response) => response.json())
+      .then((result) => {
+        if (!active || !result?.success || !result?.data) return;
+        setContactDetails((prev) => ({
+          ...prev,
+          phone: result.data.contactPhone || prev.phone,
+          phoneHref: result.data.phoneHref || prev.phoneHref,
+          email: result.data.contactEmail || prev.email,
+          emailHref: result.data.emailHref || prev.emailHref,
+          locationLabel: result.data.contactLocationLabel || prev.locationLabel,
+          mapsHref: result.data.contactMapsHref || prev.mapsHref,
+        }));
+      })
+      .catch(() => {
+        // keep default contact data
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     // prefer selected property from backend/profile (no localStorage)
